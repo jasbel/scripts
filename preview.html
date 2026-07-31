@@ -52,6 +52,33 @@
     background: #057AFF;
     color: #fff;
   }
+  .send-btn {
+    border: 0;
+    background: #1a8a3c;
+    color: #fff;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background .12s, opacity .12s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .send-btn:hover:not(:disabled) { background: #21a347; }
+  .send-btn:disabled { opacity: .55; cursor: default; }
+  .send-btn.error { background: #a32323; }
+  .send-btn.error:hover:not(:disabled) { background: #c12828; }
+  .send-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #fff; opacity: .6;
+  }
+  .send-btn.busy .send-dot {
+    opacity: 1;
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: .3; } 50% { opacity: 1; } }
   .status {
     font-size: 12px;
     opacity: .6;
@@ -75,7 +102,7 @@
     width: 701px;
     max-width: 100%;
   }
-  .frame-wrap.mobile { width: 375px; }
+  .frame-wrap.mobile { width: 390px; }
   .frame-wrap.web { width: 100%; max-width: 100%; }
   iframe {
     display: block;
@@ -90,9 +117,13 @@
     <h1>SoloCruceros · Reserve</h1>
     <div class="seg" id="seg">
       <button data-w="700" class="active">Desktop · 700</button>
-      <button data-w="375">Mobile · 375</button>
+      <button data-w="390">Mobile · 390</button>
       <button data-w="web">Web · 100%</button>
     </div>
+    <button class="send-btn" id="sendBtn" title="Enviar el email renderizado a TEST_TO">
+      <span class="send-dot"></span>
+      <span id="sendLabel">Enviar prueba</span>
+    </button>
     <span class="status" id="status">conectando…</span>
   </div>
   <div class="stage">
@@ -111,9 +142,53 @@
     if (!btn) return;
     document.querySelectorAll('#seg button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    wrap.classList.toggle('mobile', btn.dataset.w === '375');
+    wrap.classList.toggle('mobile', btn.dataset.w === '390');
     wrap.classList.toggle('web', btn.dataset.w === 'web');
   });
+
+  // --- Enviar prueba por SMTP ---
+  const sendBtn = document.getElementById('sendBtn');
+  const sendLabel = document.getElementById('sendLabel');
+  let sending = false;
+
+  async function enviarPrueba() {
+    if (sending) return;
+    sending = true;
+    sendBtn.disabled = true;
+    sendBtn.classList.remove('error');
+    sendBtn.classList.add('busy');
+    sendLabel.textContent = 'Enviando…';
+    try {
+      const r = await fetch('/send-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await r.json();
+      if (!r.ok || !data.ok) {
+        throw new Error(data.error || ('HTTP ' + r.status));
+      }
+      sendLabel.textContent = 'Enviado a ' + (data.to || '?');
+      status.textContent = 'enviado OK';
+      status.style.opacity = 1;
+      setTimeout(() => { sendLabel.textContent = 'Enviar prueba'; }, 4000);
+    } catch (err) {
+      console.error('[send]', err);
+      sendBtn.classList.add('error');
+      sendLabel.textContent = 'Error';
+      const hint = err.message.includes('Faltan credenciales')
+        ? 'Falta .env (ver consola)'
+        : 'Revisa consola (F12)';
+      status.textContent = hint;
+      status.style.opacity = 1;
+    } finally {
+      sendBtn.classList.remove('busy');
+      sendBtn.disabled = false;
+      sending = false;
+    }
+  }
+
+  sendBtn.addEventListener('click', enviarPrueba);
 
   const ws = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + '/ws');
   ws.onopen  = () => { status.textContent = 'live'; status.style.opacity = .6; };

@@ -175,9 +175,10 @@ Mantener <!-- marcadores -->, no usar id. Variables {{{x}}}=HTML, {{x}}=texto; n
 
 FIGMA Mobile : https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=330-713&m=dev
 FIGMA Desktop: https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=381-1245&m=dev
-VARIABLES: {{#truspilotInformation}}…{{/truspilotInformation}}
+
 
 - Caja con borde, descripción + logo. Tabla con border + padding.
+tengo el truspilot image esta en, `{apiUrl}}/uploads/email/icons/trustpilot.png`
 ```
 
 ```text

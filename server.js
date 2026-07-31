@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import WebSocket, { WebSocketServer } from 'ws';
 import http from 'node:http';
@@ -6,6 +7,7 @@ import path from 'node:path';
 import Mustache from 'mustache';
 import chokidar from 'chokidar';
 import { PATHS } from './config.js';
+import { sendTestHtml, SMTP_ENV } from './send.js';
 
 const PORT = process.env.PORT || 3456;
 
@@ -53,6 +55,38 @@ app.get('/render', (_req, res) => {
 // Devuelve el JSON de datos por si se quiere editar en el cliente
 app.get('/data', (_req, res) => {
   res.json(loadData());
+});
+
+// Envia el email renderizado a TEST_TO por SMTP (prueba local)
+app.use(express.json());
+app.post('/send-test', async (req, res) => {
+  const cfg = !SMTP_ENV.user || !SMTP_ENV.pass ? null : {
+    user: SMTP_ENV.user ? '****' + SMTP_ENV.user.slice(-12) : '(vacio)',
+    to:   SMTP_ENV.to || '(vacio)',
+    cc:   SMTP_ENV.cc || '(vacio)',
+  };
+  try {
+    const html = render();
+    const { to, cc, subject, messageId } = await sendTestHtml({
+      html,
+      subject: req.body?.subject,
+      to: req.body?.to,
+      cc: req.body?.cc,
+    });
+    console.log(`[send] enviado a ${to} · cc=${cc} · subject="${subject}" · id=${messageId}`);
+    res.json({ ok: true, to, subject, messageId });
+  } catch (e) {
+    console.error('[send] error:', e.message);
+    if (e.code === 'NO_CONFIG') {
+      return res.status(400).json({
+        ok: false,
+        error: e.message,
+        hint: 'Crea .env a partir de .env.example con tus credenciales de Gmail.',
+        currentConfig: cfg,
+      });
+    }
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 // Preview con marco Desktop/Mobile + hot-reload
