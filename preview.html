@@ -122,8 +122,23 @@
     const msg = JSON.parse(ev.data);
     if (msg.type === 'reload') {
       status.textContent = 'recargando…';
-      frame.contentWindow.location.replace('/render');
-      setTimeout(() => { status.textContent = 'live'; status.style.opacity = .6; }, 400);
+      // Sin recargar el documento: reemplazamos solo el contenido.
+      // Así el navegador reutiliza las imágenes desde su caché HTTP
+      // (sin parpadeo) y el scroll se preserva solo.
+      fetch('/render', { cache: 'no-cache' })
+        .then(r => r.text())
+        .then(html => {
+          const doc = frame.contentDocument;
+          if (!doc) return;
+          const parsed = new DOMParser().parseFromString(html, 'text/html');
+          doc.head.innerHTML = parsed.head.innerHTML;
+          doc.body.innerHTML = parsed.body.innerHTML;
+        })
+        .catch(err => console.error('[reload]', err))
+        .finally(() => {
+          status.textContent = 'live';
+          status.style.opacity = .6;
+        });
     }
   };
 </script>
