@@ -72,10 +72,11 @@
     border-radius: 6px;
     overflow: hidden;
     transition: width .2s ease;
-    width: 700px;
+    width: 701px;
     max-width: 100%;
   }
   .frame-wrap.mobile { width: 375px; }
+  .frame-wrap.web { width: 100%; max-width: 100%; }
   iframe {
     display: block;
     border: 0;
@@ -90,6 +91,7 @@
     <div class="seg" id="seg">
       <button data-w="700" class="active">Desktop · 700</button>
       <button data-w="375">Mobile · 375</button>
+      <button data-w="web">Web · 100%</button>
     </div>
     <span class="status" id="status">conectando…</span>
   </div>
@@ -110,6 +112,7 @@
     document.querySelectorAll('#seg button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     wrap.classList.toggle('mobile', btn.dataset.w === '375');
+    wrap.classList.toggle('web', btn.dataset.w === 'web');
   });
 
   const ws = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + '/ws');
