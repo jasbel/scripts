@@ -1,0 +1,217 @@
+{
+  "siteName": "SoloCruceros.com",
+  "showSectionTrustPilot": false,
+  "viewHTML": true,
+  "siteUrl": "https://pre.solocruceros.com",
+  "logoPhoneImg": "https://apisandbox.solocruceros.com/uploads/email/2020/header-site-1.jpg",
+  "titleMailContent": "Presupuesto Crucero",
+  "locatorReserve": "2026-36776",
+  "descriptionMailContent": "PRESUPUESTO",
+  "apiUrl": "https://apisandbox.solocruceros.com",
+  "nameClient": "yer mata",
+  "phoneClient": "+34 368558652",
+  "emailClient": "solocrucerosweb@gmail.com",
+  "dateBudget": "29/07/2026",
+  "shipPrimaryImg": "https://apisandbox.solocruceros.com/media/ships/570/file_image?date=20220614054610",
+  "departureDate": "17/06/2027",
+  "arrivalDate": "20/06/2027",
+  "cruiseName": "MSC Seashore 4 días desde Puerto Cañaveral",
+  "cruiseDescription": "4 días desde Puerto Cañaveral",
+  "passengers": "2",
+  "showSectionCruce": true,
+  "itineraryImg": "https://apisandbox.solocruceros.com/media/cruises/6782571/itineraryImg",
+  "itineraryInfo": [
+    {
+      "day": "1",
+      "port": "Puerto Cañaveral",
+      "arrival": false,
+      "departure": "16:00"
+    },
+    {
+      "day": "2",
+      "port": "Nassau",
+      "arrival": "09:00",
+      "departure": "18:00"
+    },
+    {
+      "day": "3",
+      "port": "Ocean Cay MSC Reserva Marina (Bahamas)",
+      "arrival": "08:00",
+      "departure": "18:00"
+    },
+    {
+      "day": "4",
+      "port": "Puerto CaÃ±averal (Orlando)\t Estados Unidos",
+      "arrival": "07:00",
+      "departure": false
+    }
+  ],
+  "showSectionItinerary": true,
+  "shipName": "MSC Seashore",
+  "shipImg": "https://apisandbox.solocruceros.com/media/ships/570/secondaryImage?date=20220609062458",
+  "shipDescription": "<b>MSC Seashore </b>es la evoluci&#243;n de MSC Seaside y MSC Seaview.<div><span><br></span></div><div><span>Te abre sus puertas para que te deslumbres y disfrutes de sus revolucionarias instalaciones. Pasar&#225;s incre&#237;bles momentos en el <b>parque acu&#225;tico</b> interactivo y en el <b>cine 5D</b>. Podr&#225;s correr carreras de <b>F&#243;rmula 1 de realidad virtual</b> o divertirte en el <b>laberinto VR</b>.&#160;</span><br></div><div><div><br></div><div>Experimenta la innovaci&#243;n a bordo de<b> MSC Seashore</b>.</div></div>",
+  "shipUrl": "https://pre.solocruceros.com/msc-cruceros/msc-seashore",
+  "shipOpinionImg": "https://apisandbox.solocruceros.com/uploads/email/2020/ship_opinion_img.jpg",
+  "showSectionShip": true,
+  "cabins": [
+    {
+      "imageCabin": "https://apisandbox.solocruceros.com/media/category/12066/image?date=20211104215221",
+      "categoryCabin": "OB-Exterior Bella Garantizado",
+      "passengerQty": "2 Pasajeros",
+      "passengerLabel": "",
+      "numberCabin": "5161",
+      "tracker": "pendiente",
+      "descriptionCabin": "Todos los camarotes disponen de cama de matrimonio o individual (bajo petici&#243;n). Amplio guardarropa. Cuarto de ba&#241;o con ducha. TV interactiva y Tel&#233;fono. Disponibilidad de conexi&#243;n a Internet v&#237;a Wi-Fi (previo pago). Minibar y caja fuerte. Aire acondicionado. El camarote es garantizado, el n&#250;mero de camarote vendr&#225; asignado por la naviera. Algunos camarotes pueden tener la vista obstruida. Tama&#241;o aproximado &lt;14m&#178;. Dentro de la misma categor&#237;a de camarote, el tama&#241;o, la disposici&#243;n y los muebles pueden variar respecto a las im&#225;genes. La imagen se muestra &#250;nicamente con fines ilustrativos.",
+      "passengerListCabin": [
+        {
+          "name": false,
+          "surname": false,
+          "birthday": "01/01/1994"
+        },
+        {
+          "name": false,
+          "surname": false,
+          "birthday": "01/01/1994"
+        }
+      ]
+    }
+  ],
+  "showSectionCabin": true,
+  "showSectionTransport": false,
+  "isCostaCruiseLine": true,
+  "serviceInclude": [
+    {
+      "apiUrl": "https://apisandbox.solocruceros.com",
+      "name": "Alojamiento en el camarote asignado y servicio de limpieza diaria"
+    },
+    {
+      "apiUrl": "https://apisandbox.solocruceros.com",
+      "name": "Pensión completa a bordo"
+    },
+    {
+      "apiUrl": "https://apisandbox.solocruceros.com",
+      "name": "Actividades, música en vivo, espectáculos nocturnos y animación"
+    },
+    {
+      "apiUrl": "https://apisandbox.solocruceros.com",
+      "name": "Acceso y uso de las instalaciones: gimnasio, piscinas, biblioteca, discoteca y teatro"
+    },
+    {
+      "apiUrl": "https://apisandbox.solocruceros.com",
+      "name": "Impuestos y tasas de embarque"
+    }
+  ],
+  "serviceNotInclude": [
+    {
+      "apiUrl": "https://apisandbox.solocruceros.com",
+      "name": "Cuota de servicio (propinas) salvo si está especificado"
+    },
+    {
+      "apiUrl": "https://apisandbox.solocruceros.com",
+      "name": "Excursiones opcionales en tierra"
+    },
+    {
+      "apiUrl": "https://apisandbox.solocruceros.com",
+      "name": "Restaurantes temáticos"
+    },
+    {
+      "apiUrl": "https://apisandbox.solocruceros.com",
+      "name": "Bebidas no incluidas, salvo si está especificado"
+    },
+    {
+      "apiUrl": "https://apisandbox.solocruceros.com",
+      "name": "Servicios personales (peluquería, médico…)"
+    },
+    {
+      "apiUrl": "https://apisandbox.solocruceros.com",
+      "name": "Seguro de viaje o anulación, salvo si está especificado en la reserva"
+    }
+  ],
+  "serviceInformation": [
+    {
+      "name": "Información importante. Los pasajeros a partir de 12 años deben presentar resultado negativo de PCR/antígenos* realizada 48h antes de la salida y cumplir uno de los siguientes requisitos: estar completamente vacunados y presentar certificado de vacunación válido o presentar certificado oficial tras haber contraído Covid-19 en los últimos 6 meses antes del crucero. Se considera completamente vacunados: - haber completado el ciclo de vacunación en los últimos 9 meses (6 meses para residentes en Italia) y 14 días antes de la salida. Aquellos pasajeros que hayan contraído Covid-19 y hayan recibido solo una dosis de vacuna se considerarán como vacunados, siempre que hayan pasado la enfermedad o hayan recibido la vacuna en los últimos 6 meses. - que se haya completado el ciclo de vacunación con una dosis de refuerzo 14 días antes de la salida del barco. Los niños de 2-11 años deben presentar prueba negativa PCR/antígenos* realizada 48h antes de la salida. Un seguro con cobertura COVID es obligatorio**\n\n**SEGURO OBLIGATORIO: Todos los pasajeros tienen que tener obligatoriamente contratado un seguro con cobertura COVID. Este seguro debe cubrir anulación y asistencia y llevar la póliza impresa para el embarque. MSC ofrece seguro COVID desde 25€ por persona que puede añadir en el proceso de reserva *Las pruebas de antígenos de autodiagnóstico no son aceptadas para embarcar. A todos los pasajeros (mayores de 2 años) se les someterá a un test de antígenos en el momento del embarque. EXCURSIONES: Para cruceros con salida hasta 31/03. Para desembarcar en los puertos de escala es obligatorio contratar las excursiones de MSC Cruceros. Para algunas excursiones será necesario disponer del Certificado Digital Covid para acceder a algunos lugares (museos, monumentos, etc.) o para participar en eventos. En la actualidad los cruceros solo están disponibles para aquellos pasajeros que residen en el área Schengen. La información anterior está sujeta a posibles variaciones, por favor, es muy importante que verifique antes de su salida los protocolos de embarque y/o de los países visitados en referente al Covid19."
+    },
+    {
+      "name": "Covid-19: requisitos de viaje para residentes en países Schengen. Todos los pasajeros deberán cumplir con al menos uno de los siguientes requisitos: •\tEstar vacunado con pauta completa y presentar el resultado negativo de un test PCR-RT o de antígenos, 48 horas antes de la salida del crucero. Por pauta completa se entiende aquellos pasajeros que hayan completado el ciclo de vacunación 14 días antes de la salida del barco con una de las siguientes vacunas:Pfizer, Moderna, AstraZeneca, Johnson & Johnson. Se aceptan combinaciones de vacunas (siempre que sean las anteriormente mencionadas). Aquellos pasajeros que hayan contraído la enfermedad Covid-19 (en los últimos 6 meses) y que hayan recibido solo una (1) dosis de vacuna se considerarán como vacunados. •\tHaber contraído la enfermedad Covid-19 en los últimos 6 meses Y presentar el resultado negativo de un test PCR-RT o de antígenos, 48 horas antes de la salida del crucero. Por ejemplo, si la hora de embarque para tu crucero es el sábado a las 15:00, tienes que hacerte la prueba Covid-19 el jueves a partir de las 15:00.\n\nLos pasajeros de entre 2 y 11 años, al no poder hacerse la vacunación, pueden embarcarse a bordo de nuestros barcos presentando el resultado negativo de un test PCR-RT  o de antígenos, 48 horas antes de la salida del barco. Los pasajeros menores de 2 años no necesitan ningún requisito."
+    }
+  ],
+  "showSectionIncludeNotInclude": true,
+  "priceInfo": [
+    {
+      "label": "Tarifa cabina OB - Pasajero 1",
+      "quantity": "1",
+      "grossAmountLiteral": "349,00€",
+      "totalGrossAmountLiteral": "349,00€"
+    },
+    {
+      "label": "Tarifa cabina OB - Pasajero 2",
+      "quantity": "1",
+      "grossAmountLiteral": "349,00€",
+      "totalGrossAmountLiteral": "349,00€"
+    },
+    {
+      "label": "Tasas de Embarque",
+      "quantity": "1",
+      "grossAmountLiteral": "240,00€",
+      "totalGrossAmountLiteral": "240,00€"
+    },
+    {
+      "label": "Cuota Servicio",
+      "quantity": "1",
+      "grossAmountLiteral": "90,00€",
+      "totalGrossAmountLiteral": "90,00€"
+    }
+  ],
+  "priceTotal": "1.028,00€",
+  "currencySymbol": "",
+  "notes": false,
+  "paymentCalendarInfo": [
+    {
+      "concept": "Pago 1",
+      "deadlineConfirm": "29/07/2026",
+      "amount": "154,00€",
+      "keyC": false,
+      "status": "Pendiente de pago"
+    },
+    {
+      "concept": "Pago 2",
+      "deadlineConfirm": "03/04/2027",
+      "amount": "874,00€",
+      "keyC": false,
+      "status": "Pendiente de pago"
+    }
+  ],
+  "urlPayment": false,
+  "scalapayUrlPayment": false,
+  "beneficiary": "AETHALIA VIAJES Y CRUCEROS",
+  "siteEmail": "reservas@solocruceros.com",
+  "bankAccounts": [
+    {
+      "entity": "CAIXABANK",
+      "iban": "ES7921003084827200310890",
+      "swift": "CAIXESBBXXX"
+    },
+    {
+      "entity": "BBVA",
+      "iban": "ES2301821017130201536495",
+      "swift": "BBVAESMM"
+    },
+    {
+      "entity": "BANCO SABADELL",
+      "iban": "ES7900810215220001871988",
+      "swift": "BSABESBBXXX"
+    },
+    {
+      "entity": "BANCO SANTANDER",
+      "iban": "ES2600494769812216127951",
+      "swift": "BSCHESMM"
+    }
+  ],
+  "showSectionGoogleOpinion": false,
+  "urlTermsConditionsSale": "",
+  "urlPrivacyPolicy": "",
+  "cancellationCost": false,
+  "authorizationNumber": false,
+  "cifNumber": false,
+  "currentYear": ""
+}

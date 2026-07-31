@@ -1,0 +1,17 @@
+{
+  "name": "email-dev-solocruceros",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Preview y hot-reload del email de reserva (Mustache) con datos reales extraidos del HTML producido.",
+  "type": "module",
+  "scripts": {
+    "extract": "node extract.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "express": "^4.19.2",
+    "mustache": "^4.2.0",
+    "ws": "^8.18.0"
+  }
+}
