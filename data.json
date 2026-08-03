@@ -218,5 +218,6 @@
   "cifNumber": false,
   "currentYear": "2026",
 
-  "hiddenSecction": true
+  "hiddenSecction": true,
+  "directionCruise": "Barcelona"
 }
