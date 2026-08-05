@@ -23,6 +23,7 @@
     background: #2b313a;
     border-bottom: 1px solid #11141a;
     flex: 0 0 auto;
+    flex-wrap: wrap;
   }
   .toolbar h1 {
     font-size: 13px;
@@ -52,6 +53,17 @@
     background: #057AFF;
     color: #fff;
   }
+  .mockup-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #b9c0cc;
+    cursor: pointer;
+    user-select: none;
+  }
+  .mockup-toggle input { cursor: pointer; accent-color: #057AFF; }
+  .mockup-toggle.disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
   .send-btn {
     border: 0;
     background: #1a8a3c;
@@ -120,6 +132,17 @@
       <button data-w="390">Mobile · 390</button>
       <button data-w="web">Web · 100%</button>
     </div>
+    <div class="seg" id="clientSeg">
+      <button data-client="original" class="active" title="Sin filtrar CSS">Original</button>
+      <button data-client="gmail-web" title="Gmail Web">Gmail</button>
+      <button data-client="outlook-windows" title="Outlook Windows">Outlook</button>
+      <button data-client="apple-mail" title="Apple Mail">Apple</button>
+      <button data-client="yahoo-mail" title="Yahoo Mail">Yahoo</button>
+    </div>
+    <label class="mockup-toggle" id="mockupLabel" title="Mostrar el email dentro de la interfaz del cliente (Gmail/Outlook)">
+      <input type="checkbox" id="mockupToggle">
+      <span>Mockup</span>
+    </label>
     <button class="send-btn" id="sendBtn" title="Enviar el email renderizado a TEST_TO">
       <span class="send-dot"></span>
       <span id="sendLabel">Enviar prueba</span>
@@ -144,6 +167,91 @@
     btn.classList.add('active');
     wrap.classList.toggle('mobile', btn.dataset.w === '390');
     wrap.classList.toggle('web', btn.dataset.w === 'web');
+  });
+
+  // --- Selector de cliente + mockup ---
+  let currentClient = 'original';
+  let mockupEnabled = false;
+  const clientSeg = document.getElementById('clientSeg');
+  const mockupToggle = document.getElementById('mockupToggle');
+  const mockupLabel = document.getElementById('mockupLabel');
+
+  const MOCKUP_CLIENTS = new Set([
+    'gmail-web', 'gmail-android', 'gmail-ios',
+    'outlook-windows', 'outlook-web', 'outlook-mac',
+  ]);
+
+  function clientHasMockup(c) {
+    return MOCKUP_CLIENTS.has(c);
+  }
+
+  function reloadFrame() {
+    status.textContent = 'cargando…';
+
+    // Mockup = documento completo → navegar el iframe
+    if (mockupEnabled && clientHasMockup(currentClient)) {
+      frame.src = '/preview/' + currentClient;
+      frame.onload = () => {
+        status.textContent = 'live';
+        status.style.opacity = .6;
+      };
+      return;
+    }
+
+    // Vista limpia: swap head/body (preserva caché de imágenes)
+    const url = currentClient === 'original' ? '/render' : '/render/' + currentClient;
+    fetch(url, { cache: 'no-cache' })
+      .then(r => r.text())
+      .then(html => {
+        const doc = frame.contentDocument;
+        if (!doc) {
+          // Si el iframe tiene un src de mockup, hay que volver a /render
+          frame.src = url;
+          frame.onload = () => {
+            status.textContent = 'live';
+            status.style.opacity = .6;
+          };
+          return;
+        }
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+        doc.head.innerHTML = parsed.head.innerHTML;
+        doc.body.innerHTML = parsed.body.innerHTML;
+        status.textContent = 'live';
+        status.style.opacity = .6;
+      })
+      .catch(err => {
+        console.error('[client]', err);
+        status.textContent = 'error';
+      });
+  }
+
+  clientSeg.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll('#clientSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentClient = btn.dataset.client;
+
+    const hasChrome = clientHasMockup(currentClient);
+    if (!hasChrome && mockupEnabled) {
+      mockupEnabled = false;
+      mockupToggle.checked = false;
+    }
+    mockupLabel.classList.toggle('disabled', !hasChrome);
+    reloadFrame();
+  });
+
+  mockupToggle.addEventListener('change', () => {
+    mockupEnabled = mockupToggle.checked;
+    if (mockupEnabled) {
+      // Forzar width web para ver el chrome completo
+      document.querySelectorAll('#seg button').forEach(b => b.classList.remove('active'));
+      const webBtn = document.querySelector('#seg button[data-w="web"]');
+      if (webBtn) webBtn.classList.add('active');
+      wrap.classList.remove('mobile');
+      wrap.classList.add('web');
+    }
+    reloadFrame();
   });
 
   // --- Enviar prueba por SMTP ---
@@ -197,23 +305,7 @@
     const msg = JSON.parse(ev.data);
     if (msg.type === 'reload') {
       status.textContent = 'recargando…';
-      // Sin recargar el documento: reemplazamos solo el contenido.
-      // Así el navegador reutiliza las imágenes desde su caché HTTP
-      // (sin parpadeo) y el scroll se preserva solo.
-      fetch('/render', { cache: 'no-cache' })
-        .then(r => r.text())
-        .then(html => {
-          const doc = frame.contentDocument;
-          if (!doc) return;
-          const parsed = new DOMParser().parseFromString(html, 'text/html');
-          doc.head.innerHTML = parsed.head.innerHTML;
-          doc.body.innerHTML = parsed.body.innerHTML;
-        })
-        .catch(err => console.error('[reload]', err))
-        .finally(() => {
-          status.textContent = 'live';
-          status.style.opacity = .6;
-        });
+      reloadFrame();
     }
   };
 </script>

@@ -8,6 +8,8 @@ import Mustache from 'mustache';
 import chokidar from 'chokidar';
 import { PATHS } from './config.js';
 import { sendTestHtml, SMTP_ENV } from './send.js';
+import { filterForClient, getSupportedClients } from './email-client-filter.js';
+import { wrapInMockup, hasMockup, buildMockupContext } from './email-mockups.js';
 
 const PORT = process.env.PORT || 3456;
 
@@ -50,6 +52,58 @@ function render() {
 // HTML ya renderizado con datos reales (lo carga el iframe de preview.html)
 app.get('/render', (_req, res) => {
   res.type('html').send(render());
+});
+
+// HTML renderizado y filtrado para un cliente específico (sin chrome)
+app.get('/render/:client', (req, res) => {
+  const client = req.params.client;
+  const supported = getSupportedClients();
+
+  if (!supported.includes(client) && client !== 'original') {
+    return res.status(400).json({
+      error: 'Cliente no soportado',
+      supported: ['original', ...supported],
+    });
+  }
+
+  const html = render();
+  const filtered = filterForClient(html, client);
+  res.type('html').send(filtered);
+});
+
+// HTML filtrado + mockup visual del cliente (Gmail/Outlook chrome)
+app.get('/preview/:client', (req, res) => {
+  const client = req.params.client;
+  const supported = getSupportedClients();
+
+  if (!supported.includes(client) && client !== 'original') {
+    return res.status(400).json({
+      error: 'Cliente no soportado',
+      supported: ['original', ...supported],
+    });
+  }
+
+  const html = render();
+  const filtered = filterForClient(html, client);
+
+  if (!hasMockup(client)) {
+    return res.type('html').send(filtered);
+  }
+
+  const ctx = buildMockupContext({
+    smtpEnv: { user: SMTP_ENV.user, to: SMTP_ENV.to, subject: SMTP_ENV.subject },
+    data: loadData(),
+  });
+  const wrapped = wrapInMockup(client, filtered, ctx);
+  res.type('html').send(wrapped);
+});
+
+// Lista de clientes soportados
+app.get('/clients', (_req, res) => {
+  res.json({
+    current: 'original',
+    supported: ['original', ...getSupportedClients()],
+  });
 });
 
 // Devuelve el JSON de datos por si se quiere editar en el cliente
@@ -128,5 +182,6 @@ watcher.on('all', (_event, file) => {
 server.listen(PORT, () => {
   console.log(`\n  Preview:   http://localhost:${PORT}`);
   console.log(`  Render:    http://localhost:${PORT}/render`);
+  console.log(`  Mockup:    http://localhost:${PORT}/preview/gmail-web`);
   console.log(`  Datos:     http://localhost:${PORT}/data\n`);
 });
