@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, cast
 
 from zai import ZaiClient
 
-from env_local import load_env
+from xtool.env_local import load_env
 
 load_env()
 
@@ -65,7 +65,7 @@ PRICING_USD_PER_1M = {
 }
 
 VALID_TYPES = ["feat", "fix", "refactor", "style", "docs", "test", "chore", "perf", "ci", "build"]
-VALID_SCOPES = ["gui", "api", "common", "db", "auth", "core", "test", "utils", "models", "scripts", "ci"]
+VALID_SCOPES = ["template", "css", "api", "common", "db", "auth", "core", "test", "utils", "models", "scripts", "ci"]
 
 SYSTEM_PROMPT = """
 Genera un mensaje de commit Conventional Commits en español.
@@ -261,7 +261,7 @@ def analizer_changes(diff, model):
     }
 
 
-def main():
+def main(argv=None):
   start_time = time.perf_counter()
 
   t_diff = time.perf_counter()
