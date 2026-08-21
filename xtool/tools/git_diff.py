@@ -1,4 +1,15 @@
 #!/usr/bin/env python3
+"""Genera un mensaje de commit Conventional Commits con IA a partir del diff staged.
+
+Uso:
+  xtool git-diff
+
+Requisitos:
+  - Estar en un repo git con cambios staged (git add)
+  - TOKEN_AI en el .env del proyecto o del arsenal
+
+El commit ganador se copia al portapapeles.
+"""
 
 import os
 import platform
