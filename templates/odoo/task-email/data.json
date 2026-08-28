@@ -1,0 +1,32 @@
+{
+  "_raw": [
+    "object.description"
+  ],
+  "object": {
+    "id": 142,
+    "logo": "/odoo/task-email/assets/logo02.png",
+    "name": "Preparar presupuesto MSC Seashore",
+    "project_id": {
+      "name": "Cruceros · Ventas web"
+    },
+    "stage_id": {
+      "name": "En curso"
+    },
+    "user_id": {
+      "name": "Ana Torrses"
+    },
+    "partner_id": {
+      "name": "Yer Mata",
+      "email": "yer.mata@example.com"
+    },
+    "date_deadline": "17/09/2026",
+    "description": "Contactar al cliente con el presupuesto del <b>MSC Seashore</b>, 4 días desde Puerto Cañaveral."
+  },
+  "ctx": {
+    "company_id": {
+      "name": "SoloCruceros"
+    },
+    "current_year": "2026"
+  },
+  "url_task": "https://example.odoo.com/web#id=142&action=project.action_view_all_task"
+}

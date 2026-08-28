@@ -4,130 +4,176 @@ import WebSocket, { WebSocketServer } from 'ws';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import Mustache from 'mustache';
 import chokidar from 'chokidar';
 import { PATHS } from './config.js';
+import { listProjects, getTemplate, watchTargets } from './projects.js';
 import { sendTestHtml, SMTP_ENV } from './send.js';
 import { filterForClient, getSupportedClients } from './email-client-filter.js';
 import { wrapInMockup, hasMockup, buildMockupContext } from './email-mockups.js';
+import { compileAll, watchMjml } from './mjml-build.js';
 
-const PORT = process.env.PORT || 3456;
+const PORT = process.env.PORT || 3466;
 
 const app = express();
 
-function loadPartials() {
-  const partials = {};
-  const compDir = PATHS.componentsDir;
-  if (fs.existsSync(compDir)) {
-    for (const f of fs.readdirSync(compDir)) {
-      if (f.endsWith('.mustache')) {
-        const name = 'components/' + f.replace(/\.mustache$/, '');
-        partials[name] = fs.readFileSync(path.join(compDir, f), 'utf8');
-      }
-    }
+/* =========================================================================
+ * Helpers
+ * ========================================================================= */
+
+function sendErr(res, e) {
+  const status = e.status || 500;
+  const body = { ok: false, error: e.message };
+  if (e.supported) body.supported = e.supported;
+  res.status(status).json(body);
+}
+
+/* Cliente WS de hot-reload para las paginas servidas directamente
+ * (/render, /preview): preview.html ya tiene el suyo, pero estas rutas
+ * navegadas solas no recargaban al guardar. Con innerHTML no se ejecuta,
+ * asi que no hay doble conexion dentro del iframe de preview.html. */
+const HOT_RELOAD_SNIPPET = `<script>(function () {
+  if (window.__emailHotReload) return;
+  window.__emailHotReload = true;
+  var dropped = false;
+  function connect() {
+    var proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    var ws = new WebSocket(proto + '://' + location.host + '/ws');
+    ws.onopen = function () { if (dropped) location.reload(); };
+    ws.onmessage = function (ev) {
+      try { if (JSON.parse(ev.data).type === 'reload') location.reload(); } catch (e) {}
+    };
+    ws.onclose = function () {
+      dropped = true;
+      setTimeout(connect, 1000);
+    };
   }
-  return partials;
+  connect();
+})();</script>`;
+
+function withHotReload(html) {
+  if (typeof html !== 'string') return html;
+  return /<\/body>/i.test(html)
+    ? html.replace(/<\/body>/i, HOT_RELOAD_SNIPPET + '$&')
+    : html + HOT_RELOAD_SNIPPET;
 }
 
-function loadData() {
-  try {
-    return JSON.parse(fs.readFileSync(PATHS.dataJson, 'utf8'));
-  } catch (e) {
-    console.warn('[data] no se pudo leer data.json:', e.message);
-    return {};
-  }
+function templateFrom(req) {
+  return getTemplate(req.params.project, req.params.tpl);
 }
 
-function render() {
-  const template = fs.readFileSync(PATHS.mustache, 'utf8');
-  const partials = loadPartials();
-  const data = loadData();
-  // Igualar escape al de Mustache.php: solo & < > " (no / ' ` =)
-  Mustache.escape = (s) =>
-    String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  Mustache.tags = ['{{', '}}'];
-  return Mustache.render(template, data, partials);
-}
-
-// HTML ya renderizado con datos reales (lo carga el iframe de preview.html)
-app.get('/render', (_req, res) => {
-  res.type('html').send(render());
-});
-
-// HTML renderizado y filtrado para un cliente específico (sin chrome)
-app.get('/render/:client', (req, res) => {
-  const client = req.params.client;
-  const supported = getSupportedClients();
-
-  if (!supported.includes(client) && client !== 'original') {
-    return res.status(400).json({
+function checkClient(res, client) {
+  if (!getSupportedClients().includes(client) && client !== 'original') {
+    res.status(400).json({
       error: 'Cliente no soportado',
-      supported: ['original', ...supported],
+      supported: ['original', ...getSupportedClients()],
     });
+    return false;
   }
+  return true;
+}
 
-  const html = render();
-  const filtered = filterForClient(html, client);
-  res.type('html').send(filtered);
-});
+/* =========================================================================
+ * API: registro de proyectos/plantillas (lo consume el selector de preview)
+ * ========================================================================= */
 
-// HTML filtrado + mockup visual del cliente (Gmail/Outlook chrome)
-app.get('/preview/:client', (req, res) => {
-  const client = req.params.client;
-  const supported = getSupportedClients();
-
-  if (!supported.includes(client) && client !== 'original') {
-    return res.status(400).json({
-      error: 'Cliente no soportado',
-      supported: ['original', ...supported],
-    });
-  }
-
-  const html = render();
-  const filtered = filterForClient(html, client);
-
-  if (!hasMockup(client)) {
-    return res.type('html').send(filtered);
-  }
-
-  const ctx = buildMockupContext({
-    smtpEnv: { user: SMTP_ENV.user, to: SMTP_ENV.to, subject: SMTP_ENV.subject },
-    data: loadData(),
-  });
-  const wrapped = wrapInMockup(client, filtered, ctx);
-  res.type('html').send(wrapped);
-});
-
-// Lista de clientes soportados
-app.get('/clients', (_req, res) => {
+app.get('/api/templates', (_req, res) => {
   res.json({
-    current: 'original',
-    supported: ['original', ...getSupportedClients()],
+    projects: listProjects().map((p) => ({
+      id: p.id,
+      engine: p.engine,
+      available: p.available,
+      reason: p.reason,
+      templates: p.templates.map((t) => t.id),
+    })),
   });
 });
 
-// Devuelve el JSON de datos por si se quiere editar en el cliente
-app.get('/data', (_req, res) => {
-  res.json(loadData());
+/* Assets estaticos de plantillas odoo: /odoo/<tpl>/assets/<file>.
+ * Debe ir antes de las rutas genericas /:project/:tpl/render/:client
+ * para que "assets" no se interprete como :client. */
+app.get('/odoo/:tpl/assets/:file', (req, res) => {
+  const dir = path.resolve(PATHS.odooTemplatesDir, req.params.tpl, 'assets');
+  const file = path.resolve(dir, req.params.file);
+  if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
+    return res.status(404).json({ ok: false, error: 'Asset no encontrado' });
+  }
+  res.sendFile(file);
 });
 
-// Envia el email renderizado a TEST_TO por SMTP (prueba local)
+/* =========================================================================
+ * Rutas genericas: /:project/:tpl/...
+ *   /:project/:tpl/render            HTML renderizado
+ *   /:project/:tpl/render/:client    HTML filtrado para un cliente
+ *   /:project/:tpl/preview/:client   HTML filtrado + mockup del cliente
+ *   /:project/:tpl/data              JSON de datos
+ *   POST /:project/:tpl/send-test    envio SMTP de prueba
+ * ========================================================================= */
+
+app.get('/:project/:tpl/render', (req, res) => {
+  try {
+    const t = templateFrom(req);
+    res.type('html').send(withHotReload(t.render()));
+  } catch (e) {
+    sendErr(res, e);
+  }
+});
+
+app.get('/:project/:tpl/render/:client', (req, res) => {
+  if (!checkClient(res, req.params.client)) return;
+  try {
+    const t = templateFrom(req);
+    res.type('html').send(withHotReload(filterForClient(t.render(), req.params.client)));
+  } catch (e) {
+    sendErr(res, e);
+  }
+});
+
+app.get('/:project/:tpl/preview/:client', (req, res) => {
+  if (!checkClient(res, req.params.client)) return;
+  try {
+    const t = templateFrom(req);
+    const filtered = filterForClient(t.render(), req.params.client);
+
+    if (!hasMockup(req.params.client)) {
+      return res.type('html').send(withHotReload(filtered));
+    }
+
+    const ctx = buildMockupContext({
+      smtpEnv: { user: SMTP_ENV.user, to: SMTP_ENV.to, subject: SMTP_ENV.subject },
+      data: t.loadData(),
+    });
+    res.type('html').send(withHotReload(wrapInMockup(req.params.client, filtered, ctx)));
+  } catch (e) {
+    sendErr(res, e);
+  }
+});
+
+app.get('/:project/:tpl/data', (req, res) => {
+  try {
+    res.json(templateFrom(req).loadData());
+  } catch (e) {
+    sendErr(res, e);
+  }
+});
+
 app.use(express.json());
-app.post('/send-test', async (req, res) => {
+
+async function sendTestRoute(req, res) {
   const cfg = !SMTP_ENV.user || !SMTP_ENV.pass ? null : {
     user: SMTP_ENV.user ? '****' + SMTP_ENV.user.slice(-12) : '(vacio)',
     to:   SMTP_ENV.to || '(vacio)',
     cc:   SMTP_ENV.cc || '(vacio)',
   };
   try {
-    const html = render();
+    const t = templateFrom(req);
+    const html = t.render();
     const { to, cc, subject, messageId } = await sendTestHtml({
       html,
       subject: req.body?.subject,
       to: req.body?.to,
       cc: req.body?.cc,
     });
-    console.log(`[send] enviado a ${to} · cc=${cc} · subject="${subject}" · id=${messageId}`);
+    console.log(`[send] ${t.project.id}/${t.id} enviado a ${to} · cc=${cc} · subject="${subject}" · id=${messageId}`);
     res.json({ ok: true, to, subject, messageId });
   } catch (e) {
     console.error('[send] error:', e.message);
@@ -139,18 +185,72 @@ app.post('/send-test', async (req, res) => {
         currentConfig: cfg,
       });
     }
-    res.status(500).json({ ok: false, error: e.message });
+    sendErr(res, e);
+  }
+}
+
+app.post('/:project/:tpl/send-test', sendTestRoute);
+
+/* =========================================================================
+ * Rutas legacy (solocruceros/reserve) — compatibilidad con bookmarks
+ * ========================================================================= */
+
+app.get('/render', (_req, res) => {
+  try {
+    res.type('html').send(withHotReload(getTemplate('solocruceros', 'reserve').render()));
+  } catch (e) {
+    sendErr(res, e);
   }
 });
 
-// Preview con marco Desktop/Mobile + hot-reload
-app.get('/', (_req, res) => {
-  res.type('html').send(previewShell());
+app.get('/render/:client', (req, res) => {
+  if (!checkClient(res, req.params.client)) return;
+  try {
+    res.type('html').send(withHotReload(filterForClient(getTemplate('solocruceros', 'reserve').render(), req.params.client)));
+  } catch (e) {
+    sendErr(res, e);
+  }
 });
 
-function previewShell() {
-  return fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), 'preview.html'), 'utf8');
-}
+app.get('/preview/:client', (req, res) => {
+  if (!checkClient(res, req.params.client)) return;
+  try {
+    const t = getTemplate('solocruceros', 'reserve');
+    const filtered = filterForClient(t.render(), req.params.client);
+    if (!hasMockup(req.params.client)) {
+      return res.type('html').send(withHotReload(filtered));
+    }
+    const ctx = buildMockupContext({
+      smtpEnv: { user: SMTP_ENV.user, to: SMTP_ENV.to, subject: SMTP_ENV.subject },
+      data: t.loadData(),
+    });
+    res.type('html').send(withHotReload(wrapInMockup(req.params.client, filtered, ctx)));
+  } catch (e) {
+    sendErr(res, e);
+  }
+});
+
+app.get('/data', (_req, res) => {
+  try {
+    res.json(getTemplate('solocruceros', 'reserve').loadData());
+  } catch (e) {
+    sendErr(res, e);
+  }
+});
+
+app.post('/send-test', (req, res) => {
+  req.params.project = 'solocruceros';
+  req.params.tpl = 'reserve';
+  sendTestRoute(req, res);
+});
+
+/* =========================================================================
+ * Preview con marco Desktop/Mobile + hot-reload
+ * ========================================================================= */
+
+app.get('/', (_req, res) => {
+  res.type('html').send(fs.readFileSync(PATHS.previewHtml, 'utf8'));
+});
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
@@ -162,11 +262,18 @@ function broadcast(msg) {
   }
 }
 
+/* MJML -> HTML: sincroniza al arrancar y recompila al guardar un .mjml.
+ * La escritura de body.html dispara el watcher de arriba (hot-reload). */
+compileAll();
+watchMjml();
+
+const targets = watchTargets();
+if (!targets.length) {
+  console.warn('[watch] sin rutas vigiables: no hay plantillas accesibles en esta maquina');
+}
 let debounce;
-const watcher = chokidar.watch(
-  [path.join(PATHS.templatesDir, '**/*.mustache'), PATHS.dataJson],
-  { ignoreInitial: true, followSymlinks: true }
-);
+const watcher = chokidar.watch(targets, { ignoreInitial: true, followSymlinks: true });
+watcher.on('error', (e) => console.error('[watch] error:', e.message));
 watcher.on('all', (_event, file) => {
   console.log('[watch] cambio detectado:', file);
   clearTimeout(debounce);
@@ -181,7 +288,11 @@ watcher.on('all', (_event, file) => {
 
 server.listen(PORT, () => {
   console.log(`\n  Preview:   http://localhost:${PORT}`);
-  console.log(`  Render:    http://localhost:${PORT}/render`);
-  console.log(`  Mockup:    http://localhost:${PORT}/preview/gmail-web`);
-  console.log(`  Datos:     http://localhost:${PORT}/data\n`);
+  for (const p of listProjects()) {
+    for (const t of p.templates) {
+      const flag = p.available ? '' : '  (NO DISPONIBLE en esta maquina)';
+      console.log(`  ${p.id}/${t.id}:  http://localhost:${PORT}/${p.id}/${t.id}/render${flag}`);
+    }
+  }
+  console.log(`  Datos:     http://localhost:${PORT}/api/templates\n`);
 });

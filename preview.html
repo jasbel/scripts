@@ -32,6 +32,16 @@
     margin-right: auto;
     opacity: .85;
   }
+  .tpl-sel {
+    background: #1f2329;
+    color: #e6e6e6;
+    border: 1px solid #11141a;
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .tpl-sel:focus { outline: 1px solid #057AFF; }
   .seg {
     display: inline-flex;
     background: #1f2329;
@@ -126,6 +136,7 @@
 </head>
 <body>
   <div class="toolbar">
+    <select id="tplSel" class="tpl-sel" title="Proyecto / plantilla"></select>
     <h1>SoloCruceros · Reserve</h1>
     <div class="seg" id="seg">
       <button data-w="700" class="active">Desktop · 700</button>
@@ -151,7 +162,7 @@
   </div>
   <div class="stage">
     <div class="frame-wrap" id="wrap">
-      <iframe id="frame" src="/render"></iframe>
+      <iframe id="frame"></iframe>
     </div>
   </div>
 
@@ -159,6 +170,51 @@
   const frame = document.getElementById('frame');
   const wrap  = document.getElementById('wrap');
   const status = document.getElementById('status');
+  const tplSel = document.getElementById('tplSel');
+
+  // --- Selector de proyecto/plantilla ---
+  let routeBase = '/solocruceros/reserve';
+
+  function onTplChange(updateUrl) {
+    const [projectId, tplId] = tplSel.value.split('/');
+    routeBase = '/' + projectId + '/' + tplId;
+    document.querySelector('.toolbar h1').textContent = projectId + ' · ' + tplId;
+    if (updateUrl) history.replaceState(null, '', '?project=' + projectId + '&tpl=' + tplId);
+    reloadFrame();
+  }
+
+  async function initTemplates() {
+    let projects = [];
+    try {
+      const r = await fetch('/api/templates', { cache: 'no-cache' });
+      projects = (await r.json()).projects || [];
+    } catch (err) {
+      console.error('[templates]', err);
+    }
+    for (const p of projects) {
+      for (const t of p.templates) {
+        const opt = document.createElement('option');
+        opt.value = p.id + '/' + t.id;
+        opt.textContent = p.id + ' / ' + t.id + (p.available ? '' : ' (no disponible)');
+        tplSel.appendChild(opt);
+      }
+    }
+    if (!tplSel.options.length) {
+      status.textContent = 'sin plantillas';
+      return;
+    }
+    const q = new URLSearchParams(location.search);
+    const want = q.get('project') && q.get('tpl') ? q.get('project') + '/' + q.get('tpl') : null;
+    const has = want && [...tplSel.options].some((o) => o.value === want);
+    if (has) {
+      tplSel.value = want;
+    } else {
+      const p = projects.find((x) => x.available && x.templates.length) || projects[0];
+      tplSel.value = p.id + '/' + p.templates[0];
+    }
+    tplSel.addEventListener('change', () => onTplChange(true));
+    onTplChange(false);
+  }
 
   document.getElementById('seg').addEventListener('click', (e) => {
     const btn = e.target.closest('button');
@@ -190,7 +246,7 @@
 
     // Mockup = documento completo → navegar el iframe
     if (mockupEnabled && clientHasMockup(currentClient)) {
-      frame.src = '/preview/' + currentClient;
+      frame.src = routeBase + '/preview/' + currentClient;
       frame.onload = () => {
         status.textContent = 'live';
         status.style.opacity = .6;
@@ -199,10 +255,10 @@
     }
 
     // Vista limpia: swap head/body (preserva caché de imágenes)
-    const url = currentClient === 'original' ? '/render' : '/render/' + currentClient;
+    const url = currentClient === 'original' ? routeBase + '/render' : routeBase + '/render/' + currentClient;
     fetch(url, { cache: 'no-cache' })
-      .then(r => r.text())
-      .then(html => {
+      .then(r => r.text().then(html => ({ ok: r.ok, html })))
+      .then(({ ok, html }) => {
         const doc = frame.contentDocument;
         if (!doc) {
           // Si el iframe tiene un src de mockup, hay que volver a /render
@@ -211,6 +267,16 @@
             status.textContent = 'live';
             status.style.opacity = .6;
           };
+          return;
+        }
+        if (!ok) {
+          // Error (p.ej. plantilla no disponible en esta maquina): mostrar el motivo
+          const parsed = new DOMParser().parseFromString('<pre></pre>', 'text/html');
+          parsed.body.firstChild.textContent = html;
+          doc.head.innerHTML = '';
+          doc.body.innerHTML = parsed.body.innerHTML;
+          status.textContent = 'error';
+          status.style.opacity = 1;
           return;
         }
         const parsed = new DOMParser().parseFromString(html, 'text/html');
@@ -267,7 +333,7 @@
     sendBtn.classList.add('busy');
     sendLabel.textContent = 'Enviando…';
     try {
-      const r = await fetch('/send-test', {
+      const r = await fetch(routeBase + '/send-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -308,6 +374,9 @@
       reloadFrame();
     }
   };
+
+  initTemplates();
+
 </script>
 </body>
 </html>

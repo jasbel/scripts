@@ -1,0 +1,19 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.tabSize": 2,
+  "files.eol": "\n",
+  "files.associations": {
+    "*.mustache": "html",
+    "*.mjml": "mjml"
+  },
+  "emmet.includeLanguages": {
+    "mjml": "xml"
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/package-lock.json": true,
+    "data.json": true
+  },
+  "javascript.preferences.importModuleSpecifier": "relative"
+}

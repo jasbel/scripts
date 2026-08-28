@@ -1,0 +1,13 @@
+<mjml lang="es">
+<mj-head>
+  <mj-title>Smoke test</mj-title>
+</mj-head>
+<mj-body>
+  <mj-section>
+    <mj-column>
+      <mj-text font-size="20px" font-weight="bold">Hola {{ partner_name }},</mj-text>
+      <mj-text>Tu reserva {{ reservation_code }} está confirmada.</mj-text>
+    </mj-column>
+  </mj-section>
+</mj-body>
+</mjml>

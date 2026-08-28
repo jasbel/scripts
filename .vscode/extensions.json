@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "esbenp.prettier-vscode",
+    "attilabuti.vscode-mjml",
+    "mikestead.dotenv",
+    "humao.rest-client"
+  ]
+}
