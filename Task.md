@@ -74,3 +74,18 @@ footer:
   logo-footer: (<!-- Footer -->) logo imagen , descripcion
     [MOBILE] @https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=161-499&m=dev
     [DESKTOP] (veo que el logo es un svg, dejarlo como 1 sola  imagen o si es texto dejarlo) @https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=226-376&m=dev
+
+---
+este es el template
+@templates/odoo/task-email/body.html 
+
+disenio del body para desktop
+@https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=642-1346&m=dev
+
+disenio del body para mobile
+@https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=615-707&m=dev
+
+necesito que se implemente el body.html esto es para correos electrónicos de los emails.
+
+---
+
