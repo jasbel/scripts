@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resolvedor de Variables CSS</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #1f2329;
+      color: #e6e6e6;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      font-weight: 600;
+    }
+
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .panel {
+      background: #2b313a;
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid #11141a;
+    }
+
+    .panel h2 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      opacity: 0.8;
+      font-weight: 600;
+    }
+
+    textarea {
+      width: 100%;
+      height: 400px;
+      background: #1f2329;
+      border: 1px solid #11141a;
+      border-radius: 6px;
+      color: #e6e6e6;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 13px;
+      padding: 12px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #057AFF;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      border: 0;
+      background: #057AFF;
+      color: #fff;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.12s;
+    }
+
+    button:hover { background: #0066cc; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .copy-btn {
+      background: #1a8a3c;
+    }
+    .copy-btn:hover { background: #21a347; }
+
+    .stats {
+      background: #2b313a;
+      border-radius: 6px;
+      padding: 12px 16px;
+      border: 1px solid #11141a;
+      font-size: 13px;
+      opacity: 0.8;
+    }
+
+    .stats span {
+      display: inline-block;
+      margin-right: 20px;
+    }
+
+    .stats strong {
+      color: #057AFF;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔧 Resolvedor de Variables CSS</h1>
+
+    <div class="actions">
+      <button id="processBtn">Procesar CSS</button>
+      <button id="clearBtn">Limpiar</button>
+      <button id="copyBtn" class="copy-btn">Copiar Resultado</button>
+    </div>
+
+    <div class="stats" id="stats">
+      <span>Variables encontradas: <strong>0</strong></span>
+      <span>Propiedades procesadas: <strong>0</strong></span>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>📥 CSS con variables (Entrada)</h2>
+        <textarea id="inputCss" placeholder="Pega aquí tu código CSS con variables var(...)
+Ejemplo:
+color: var(--text-primary, #141414);
+font-size: var(--font-size-base, 16px);"></textarea>
+      </div>
+
+      <div class="panel">
+        <h2>📤 CSS resuelto (Salida)</h2>
+        <textarea id="outputCss" readonly placeholder="El CSS procesado aparecerá aquí..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const inputCss = document.getElementById('inputCss');
+    const outputCss = document.getElementById('outputCss');
+    const processBtn = document.getElementById('processBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const stats = document.getElementById('stats');
+
+    // Ejemplo inicial
+    const exampleCss = `color: var(--text-text-primary, #141414);
+
+/* Base Font/Body M */
+font-family: var(--Body-base-font-family, Satoshi);
+font-size: var(--Body-base-font-size, 16px);
+font-style: normal;
+font-weight: var(--Body-base-weight, 400);
+line-height: var(--Body-base-line-height, 24px); /* 150% */`;
+
+    inputCss.value = exampleCss;
+
+    function processCss() {
+      let input = inputCss.value;
+      let output = input;
+      let varCount = 0;
+      let propCount = 0;
+
+      // Regex para encontrar var(--nombre, valor-defecto)
+      const varRegex = /var\(\s*--[^,\s)]+\s*(?:,\s*([^)]+)\s*)?\)/g;
+
+      // Contar variables antes de procesar
+      const matches = input.match(varRegex);
+      if (matches) {
+        varCount = matches.length;
+      }
+
+      // Reemplazar cada variable con su valor por defecto
+      output = input.replace(varRegex, (match, defaultValue) => {
+        propCount++;
+        if (defaultValue && defaultValue.trim()) {
+          return defaultValue.trim();
+        }
+        // Si no hay valor por defecto, retornar string vacío
+        return '';
+      });
+
+      outputCss.value = output;
+
+      // Actualizar estadísticas
+      stats.innerHTML = `
+        <span>Variables encontradas: <strong>${varCount}</strong></span>
+        <span>Propiedades procesadas: <strong>${propCount}</strong></span>
+      `;
+    }
+
+    function clearAll() {
+      inputCss.value = '';
+      outputCss.value = '';
+      stats.innerHTML = `
+        <span>Variables encontradas: <strong>0</strong></span>
+        <span>Propiedades procesadas: <strong>0</strong></span>
+      `;
+      inputCss.focus();
+    }
+
+    async function copyToClipboard() {
+      try {
+        await navigator.clipboard.writeText(outputCss.value);
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = '✓ Copiado';
+        setTimeout(() => {
+          copyBtn.textContent = originalText;
+        }, 2000);
+      } catch (err) {
+        // Fallback para navegadores antiguos
+        outputCss.select();
+        document.execCommand('copy');
+        copyBtn.textContent = '✓ Copiado';
+        setTimeout(() => {
+          copyBtn.textContent = 'Copiar Resultado';
+        }, 2000);
+      }
+    }
+
+    processBtn.addEventListener('click', processCss);
+    clearBtn.addEventListener('click', clearAll);
+    copyBtn.addEventListener('click', copyToClipboard);
+
+    // Procesar automáticamente al pegar
+    inputCss.addEventListener('paste', () => {
+      setTimeout(processCss, 10);
+    });
+
+    // Atajos de teclado
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          processCss();
+        }
+      }
+    });
+
+    // Procesar el ejemplo inicial
+    processCss();
+  </script>
+</body>
+</html>

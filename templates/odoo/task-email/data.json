@@ -29,5 +29,14 @@
     },
     "current_year": "2026"
   },
-  "url_task": "https://example.odoo.com/web#id=142&action=project.action_view_all_task"
+  "url_task": "https://example.odoo.com/web#id=142&action=project.action_view_all_task",
+  "icons": {
+    "calendar_today": "/odoo/task-email/assets/icons/calendar_today.png",
+    "location_on": "/odoo/task-email/assets/icons/location_on.png",
+    "group": "/odoo/task-email/assets/icons/group.png",
+    "account_balance_wallet": "/odoo/task-email/assets/icons/account_balance_wallet.png",
+    "info": "/odoo/task-email/assets/icons/info.png",
+    "luggage": "/odoo/task-email/assets/icons/luggage.png",
+    "call": "/odoo/task-email/assets/icons/call.png"
+  }
 }

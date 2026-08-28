@@ -1,5 +1,6 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,11 +9,17 @@
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,700&display=swap" rel="stylesheet" type="text/css" />
   <style type="text/css">
     @media only screen and (max-width: 620px) {
-      .container { width: 100% !important; }
-      .card { box-shadow: 0 2px 4px -2px rgba(0, 0, 0, 0.1); }
+      .container {
+        width: 100% !important;
+      }
+
+      .card {
+        box-shadow: 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+      }
     }
   </style>
 </head>
+
 <body style="margin:0; padding:0; background-color:#f4f6f8;">
 
   <!-- Wrapper exterior -->
@@ -28,6 +35,11 @@
             <td style="padding:20px 24px; background-color:#ffffff; border-bottom:1px solid #E5E7EB;">
               <img src="{{logo}}" width="342" height="27" alt="SoloCruceros.com" style="display:block; width:100%; max-width:342px; height:auto; border:0; font-size:0;" />
             </td>
+          </tr>
+
+          <!-- Introduction -->
+          <tr>
+
           </tr>
 
           <!-- Body -->
@@ -56,52 +68,62 @@
                       <!-- 1. Fechas -->
                       <tr>
                         <td width="28" valign="top" style="width:28px; padding:5px 10px 0 0; font-size:0; line-height:0;">
-                          <img src="/odoo/task-email/assets/icons/calendar_today.png" width="13" height="14" alt="" style="display:block; border:0;" />
+                          <img src="{{ icons.calendar_today }}" width="13" height="14" alt="" style="display:block; border:0;" />
                         </td>
                         <td valign="top" style="font-size:16px; line-height:24px; color:#141414; padding:0 0 12px 0;">Fechas aproximadas de viaje</td>
                       </tr>
-                      <tr><td colspan="2" style="border-top:1px solid #E5E7EB; font-size:0; line-height:0;">&nbsp;</td></tr>
+                      <tr>
+                        <td colspan="2" style="border-top:1px solid #E5E7EB; font-size:0; line-height:0;">&nbsp;</td>
+                      </tr>
 
                       <!-- 2. Itinerario -->
                       <tr>
                         <td width="28" valign="top" style="width:28px; padding:17px 10px 0 0; font-size:0; line-height:0;">
-                          <img src="/odoo/task-email/assets/icons/location_on.png" width="11" height="14" alt="" style="display:block; border:0;" />
+                          <img src="{{ icons.location_on }}" width="11" height="14" alt="" style="display:block; border:0;" />
                         </td>
                         <td valign="top" style="font-size:16px; line-height:24px; color:#141414; padding:12px 0;">Itinerario o puerto de embarque deseado</td>
                       </tr>
-                      <tr><td colspan="2" style="border-top:1px solid #E5E7EB; font-size:0; line-height:0;">&nbsp;</td></tr>
+                      <tr>
+                        <td colspan="2" style="border-top:1px solid #E5E7EB; font-size:0; line-height:0;">&nbsp;</td>
+                      </tr>
 
                       <!-- 3. Personas -->
                       <tr>
                         <td width="28" valign="top" style="width:28px; padding:18px 10px 0 0; font-size:0; line-height:0;">
-                          <img src="/odoo/task-email/assets/icons/group.png" width="15" height="11" alt="" style="display:block; border:0;" />
+                          <img src="{{ icons.group }}" width="15" height="11" alt="" style="display:block; border:0;" />
                         </td>
                         <td valign="top" style="font-size:16px; line-height:24px; color:#141414; padding:12px 0;">Número de personas que viajarán</td>
                       </tr>
-                      <tr><td colspan="2" style="border-top:1px solid #E5E7EB; font-size:0; line-height:0;">&nbsp;</td></tr>
+                      <tr>
+                        <td colspan="2" style="border-top:1px solid #E5E7EB; font-size:0; line-height:0;">&nbsp;</td>
+                      </tr>
 
                       <!-- 4. Presupuesto -->
                       <tr>
                         <td width="28" valign="top" style="width:28px; padding:17px 10px 0 0; font-size:0; line-height:0;">
-                          <img src="/odoo/task-email/assets/icons/account_balance_wallet.png" width="14" height="13" alt="" style="display:block; border:0;" />
+                          <img src="{{ icons.account_balance_wallet }}" width="14" height="13" alt="" style="display:block; border:0;" />
                         </td>
                         <td valign="top" style="font-size:16px; line-height:24px; color:#141414; padding:12px 0;">Presupuesto orientativo</td>
                       </tr>
-                      <tr><td colspan="2" style="border-top:1px solid #E5E7EB; font-size:0; line-height:0;">&nbsp;</td></tr>
+                      <tr>
+                        <td colspan="2" style="border-top:1px solid #E5E7EB; font-size:0; line-height:0;">&nbsp;</td>
+                      </tr>
 
                       <!-- 5. Dudas -->
                       <tr>
                         <td width="28" valign="top" style="width:28px; padding:17px 10px 0 0; font-size:0; line-height:0;">
-                          <img src="/odoo/task-email/assets/icons/info.png" width="14" height="14" alt="" style="display:block; border:0;" />
+                          <img src="{{ icons.info }}" width="14" height="14" alt="" style="display:block; border:0;" />
                         </td>
                         <td valign="top" style="font-size:16px; line-height:24px; color:#141414; padding:12px 0;">Cualquier duda importante que quieras resolver antes de reservar</td>
                       </tr>
-                      <tr><td colspan="2" style="border-top:1px solid #E5E7EB; font-size:0; line-height:0;">&nbsp;</td></tr>
+                      <tr>
+                        <td colspan="2" style="border-top:1px solid #E5E7EB; font-size:0; line-height:0;">&nbsp;</td>
+                      </tr>
 
                       <!-- 6. Servicios adicionales -->
                       <tr>
                         <td width="28" valign="top" style="width:28px; padding:17px 10px 0 0; font-size:0; line-height:0;">
-                          <img src="/odoo/task-email/assets/icons/luggage.png" width="10" height="14" alt="" style="display:block; border:0;" />
+                          <img src="{{ icons.luggage }}" width="10" height="14" alt="" style="display:block; border:0;" />
                         </td>
                         <td valign="top" style="font-size:16px; line-height:24px; color:#141414; padding:12px 0 0 0;">Si necesitas vuelos, traslados, seguro o cualquier servicio adicional</td>
                       </tr>
@@ -120,8 +142,8 @@
               <!-- Aviso de contacto -->
               <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td width="44" valign="top" style="width:44px; padding-right:12px; font-size:0; line-height:0;">
-                    <img src="/odoo/task-email/assets/icons/call.png" width="32" height="32" alt="Teléfono" style="display:block; border:0;" />
+                  <td width="44" valign="top" style="width:38px; padding-right:0; font-size:0; line-height:0; padding-left:6px; padding-top:10px;">
+                    <img src="{{ icons.call }}" width="22.67" height="22.67" alt="Teléfono" style="display:block; border:0;" />
                   </td>
                   <td valign="top" style="font-size:14px; line-height:19px; color:#141414;">
                     <p style="margin:0; font-size:16px; line-height:24px; font-weight:bold;">Te contactaremos lo antes posible</p>
@@ -156,4 +178,5 @@
     </tr>
   </table>
 </body>
+
 </html>
