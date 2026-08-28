@@ -98,3 +98,5 @@ de responsive mobile
 en @templates/odoo/task-email/body.html la seccion <!-- Introduction --> es donde se debe de introducir la maquetacion de correo electronico.
 
 ---
+background: var(--surface-surface-brand, #F5F8FC);
+---

@@ -37,6 +37,7 @@
     "account_balance_wallet": "/odoo/task-email/assets/icons/account_balance_wallet.png",
     "info": "/odoo/task-email/assets/icons/info.png",
     "luggage": "/odoo/task-email/assets/icons/luggage.png",
-    "call": "/odoo/task-email/assets/icons/call.png"
+    "call": "/odoo/task-email/assets/icons/call.png",
+    "check_circle": "/odoo/task-email/assets/icons/check_circle.png"
   }
 }
