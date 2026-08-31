@@ -60,6 +60,19 @@
     "celebration": "/odoo/task-email-2/assets/icons/celebration.png",
     "beach_access": "/odoo/task-email-2/assets/icons/beach_access.png",
     "dining": "/odoo/task-email-2/assets/icons/dining.png",
-    "local_activity": "/odoo/task-email-2/assets/icons/local_activity.png"
-  }
+    "local_activity": "/odoo/task-email-2/assets/icons/local_activity.png",
+    "location_on": "/odoo/task-email-2/assets/icons/location_on.png",
+    "account_balance_wallet": "/odoo/task-email-2/assets/icons/account_balance_wallet.png",
+    "info": "/odoo/task-email-2/assets/icons/info.png",
+    "call": "/odoo/task-email-2/assets/icons/call.png",
+    "directions_boat": "/odoo/task-email-2/assets/icons/directions_boat.png",
+    "directions_boat_24": "/odoo/task-email-2/assets/icons/directions_boat_24.png",
+    "hotel": "/odoo/task-email-2/assets/icons/hotel.png",
+    "photo_camera": "/odoo/task-email-2/assets/icons/photo_camera.png",
+    "water": "/odoo/task-email-2/assets/icons/water.png",
+    "task_alt": "/odoo/task-email-2/assets/icons/task_alt.png",
+    "whatsapp_white": "/odoo/task-email-2/assets/icons/whatsapp_white.png"
+  },
+  "url_whatsapp": "https://wa.me/34650717810",
+  "banner": "/odoo/task-email-2/assets/banner-cruise.jpg"
 }
