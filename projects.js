@@ -51,6 +51,8 @@ function readJsonSafe(file) {
   }
 }
 
+/* Todos los templates odoo comparten un unico data.json en templates/odoo/data.json
+ * y los assets viven en public/assets (servidos en /assets). */
 function odooTemplates() {
   const dir = PATHS.odooTemplatesDir;
   if (!fs.existsSync(dir)) return [];
@@ -58,10 +60,7 @@ function odooTemplates() {
     .filter((d) => d.isDirectory())
     .map((d) => path.join(dir, d.name, 'body.html'))
     .filter((entry) => fs.existsSync(entry))
-    .map((entry) => {
-      const id = path.basename(path.dirname(entry));
-      return { id, entry, dataJson: path.join(path.dirname(entry), 'data.json') };
-    });
+    .map((entry) => ({ id: path.basename(path.dirname(entry)), entry, dataJson: PATHS.odooDataJson }));
 }
 
 export function listProjects() {

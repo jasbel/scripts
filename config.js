@@ -20,6 +20,8 @@ export const PATHS = {
   componentsDir: path.join(TEMPLATES_DIR, 'components'),
   dataJson: path.join(__dirname, 'data.json'),
   odooTemplatesDir: ODOO_TEMPLATES_DIR,
+  odooDataJson: path.join(ODOO_TEMPLATES_DIR, 'data.json'),
+  publicAssetsDir: path.join(__dirname, 'public', 'assets'),
   previewHtml: path.join(__dirname, 'preview.html'),
 };
 
