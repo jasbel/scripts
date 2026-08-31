@@ -48,7 +48,8 @@
     "flag_cl": "/assets/icons/flag_cl.png",
     "flag_pe": "/assets/icons/flag_pe.png",
     "flag_mx": "/assets/icons/flag_mx.png",
-    "anchor": "/assets/icons/anchor.png",
+    "anchor": "/assets/icons/anchor-small.png",
+    "anchor_small": "/assets/icons/anchor.png",
     "mejor_precio": "/assets/icons/mejor_precio.png",
     "opcion_pago": "/assets/icons/opcion_pago.png",
     "atencion": "/assets/icons/atencion.png",
@@ -67,8 +68,12 @@
     "photo_camera": "/assets/icons/photo_camera.png",
     "water": "/assets/icons/water.png",
     "task_alt": "/assets/icons/task_alt.png",
-    "whatsapp_white": "/assets/icons/whatsapp_white.png"
+    "whatsapp_white": "/assets/icons/whatsapp_white.png",
+    "task": "/assets/icons/task.png",
+    "search": "/assets/icons/search.png"
   },
   "url_whatsapp": "https://wa.me/34650717810",
-  "banner": "/assets/banner-cruise.jpg"
+  "banner": "/assets/banner-cruise.jpg",
+  "banner_cruise": "/assets/cruise_banner_2.png",
+  "banner_lost": "/assets/banner_perdidos.png"
 }
