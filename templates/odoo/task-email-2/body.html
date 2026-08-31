@@ -17,6 +17,13 @@
         box-shadow: 0 2px 4px -2px rgba(0, 0, 0, 0.1);
       }
 
+      /* Para quién es: apilar en móvil */
+      .pq-cell {
+        display: block !important;
+        width: 100% !important;
+        padding: 0 !important;
+      }
+
       /* Footer */
       .footer-td {
         padding: 32px 20px !important;
@@ -96,10 +103,145 @@
             </td>
           </tr>
 
-          <!-- TODO: nuevas secciones -->
+          <!-- Introducción -->
+          <tr>
+            <td style="padding:24px 20px; background-color:#F5F8FC;">
+
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#E2EFFC" style="background-color:#E2EFFC; border-radius:999px;">
+                <tr>
+                  <td style="padding:4px 12px; border-radius:999px; font-size:14px; line-height:19px; color:#057AFF;">
+                    <img src="{{ icons.language }}" width="14" height="14" alt="" style="display:inline-block; vertical-align:-3px; border:0; margin:0 4px 0 0;" />Ideas para tu próximo viaje
+                  </td>
+                </tr>
+              </table>
+
+              <div style="height:12px; font-size:0; line-height:0;">&nbsp;</div>
+
+              <p style="margin:0; font-size:20px; line-height:28px; font-weight:bold; color:#141414;">¿Te imaginas tu próximo crucero?</p>
+
+            </td>
+          </tr>
+
           <!-- Body -->
           <tr>
-            <td style="padding:24px 20px; font-size:16px; line-height:24px; color:#141414;"></td>
+            <td style="padding:24px 20px; background-color:#ffffff; font-size:16px; line-height:24px; color:#141414;">
+
+              <p style="margin:0 0 8px 0; font-size:16px; line-height:24px; color:#141414;">Hola {{ object.partner_id.name }},</p>
+              <p style="margin:0; font-size:16px; line-height:24px; color:#141414;">Ahora que ya conocemos el tipo de crucero que estás buscando, queremos recordarte por qué esta puede ser una de las mejores formas de disfrutar tus próximas vacaciones.</p>
+
+              <p style="margin:24px 0 12px 0; font-size:18px; line-height:24px; font-weight:bold; color:#141414;">Un viaje, todo resuelto</p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="adv-cell" width="50%" valign="top" style="width:50%; padding:0 8px 0 0;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#FAFAFA" style="width:100%; background-color:#FAFAFA; border:1px solid #E5E7EB; border-radius:8px;">
+                      <tr>
+                        <td align="center" style="padding:16px 12px; border-radius:8px;">
+                          <img src="{{ icons.globe }}" width="44" height="44" alt="" style="display:block; margin:0 auto 8px auto; border:0;" />
+                          <p style="margin:0; font-size:16px; line-height:24px; color:#141414; text-align:center;">Varios destinos en un solo viaje</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td class="adv-cell" width="50%" valign="top" style="width:50%; padding:0 0 0 8px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#FAFAFA" style="width:100%; background-color:#FAFAFA; border:1px solid #E5E7EB; border-radius:8px;">
+                      <tr>
+                        <td align="center" style="padding:16px 12px; border-radius:8px;">
+                          <img src="{{ icons.trip }}" width="44" height="41" alt="" style="display:block; margin:0 auto 11px auto; border:0;" />
+                          <p style="margin:0; font-size:16px; line-height:24px; color:#141414; text-align:center;">Sin hacer y deshacer maletas</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="height:16px; font-size:0; line-height:0;">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td colspan="2" valign="top" style="padding:0;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#FAFAFA" style="width:100%; background-color:#FAFAFA; border:1px solid #E5E7EB; border-radius:8px;">
+                      <tr>
+                        <td align="center" style="padding:16px 12px; border-radius:8px;">
+                          <img src="{{ icons.celebration }}" width="45" height="42" alt="" style="display:block; margin:0 auto 10px auto; border:0;" />
+                          <p style="margin:0; font-size:16px; line-height:24px; color:#141414; text-align:center;">Todo organizado a bordo: comidas, entretenimiento y actividades</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#141414;">Además, es una opción cómoda, completa y adaptable a cada forma de viajar: relax, cultura, familia, pareja, amigos o desconexión total.</p>
+
+              <p style="margin:24px 0 12px 0; font-size:18px; line-height:24px; font-weight:bold; color:#141414;">Tú decides cómo disfrutar cada día</p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="pq-cell" width="50%" valign="top" style="width:50%; padding:0 8px 0 0;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="padding:12px 8px; border-bottom:1px solid #E5E7EB; font-size:16px; line-height:24px; color:#141414;">
+                          <img src="{{ icons.beach_access }}" width="20" height="20" alt="" style="display:inline-block; vertical-align:-4px; border:0; margin:0 16px 0 0;" />Descansar en cubierta
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td class="pq-cell" width="50%" valign="top" style="width:50%; padding:0 0 0 8px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="padding:12px 8px; border-bottom:1px solid #E5E7EB; font-size:16px; line-height:24px; color:#141414;">
+                          <img src="{{ icons.language_28 }}" width="22" height="22" alt="" style="display:inline-block; vertical-align:-5px; border:0; margin:0 14px 0 0;" />Descubrir nuevas ciudades
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="pq-cell" width="50%" valign="top" style="width:50%; padding:0 8px 0 0;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="padding:12px 8px; border-bottom:1px solid #E5E7EB; font-size:16px; line-height:24px; color:#141414;">
+                          <img src="{{ icons.dining }}" width="22" height="22" alt="" style="display:inline-block; vertical-align:-5px; border:0; margin:0 14px 0 0;" />Probar la gastronomía a bordo
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td class="pq-cell" width="50%" valign="top" style="width:50%; padding:0 0 0 8px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="padding:12px 8px; border-bottom:1px solid #E5E7EB; font-size:16px; line-height:24px; color:#141414;">
+                          <img src="{{ icons.local_activity }}" width="22" height="18" alt="" style="display:inline-block; vertical-align:-3px; border:0; margin:0 14px 0 0;" />Vivir experiencias diferentes
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              <!-- Nuevas secciones crear nueva table si es necesarios-->
+
+
+
+
+            </td>
+          </tr>
+
+          <!-- Nota -->
+          <tr>
+            <td style="padding:24px 20px; background-color:#F5F8FC;">
+              <p style="margin:0; font-size:16px; line-height:24px; color:#141414; text-align:center;">En <span style="font-weight:bold; color:#057AFF;">Solo</span><span style="font-weight:bold;">Cruceros.com</span> estamos aquí para resolver tus dudas y ayudarte a elegir la opción que mejor encaje contigo.</p>
+              <div style="height:16px; font-size:0; line-height:0;">&nbsp;</div>
+              <p style="margin:0; font-size:16px; line-height:24px; font-weight:bold; color:#141414; text-align:center;">¿Preparamos juntos tu próximo crucero?</p>
+            </td>
+          </tr>
+
+          <!-- Saludos -->
+          <tr>
+            <td style="padding:24px 20px; background-color:#ffffff;">
+              <div style="border-top:1px solid #E5E7EB; padding-top:24px;">
+                <p style="margin:0 0 4px 0; font-size:16px; line-height:24px; color:#141414;">Un saludo,</p>
+                <p style="margin:0; font-size:16px; line-height:24px; font-weight:bold; color:#141414;">El equipo de <span style="color:#057AFF;">Solo</span>Cruceros.com</p>
+              </div>
+            </td>
           </tr>
 
           <!-- Footer -->

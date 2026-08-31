@@ -21,3 +21,22 @@ mobile : @https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---
 cambios hacer en @templates/odoo/task-email-2/body.html
 
 ---
+
+disenio de figma por secciones
+seccion dudas:
+desktop: @https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=825-3576&m=dev
+mobile: @https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=825-2695&m=dev
+
+seccion whatsapp: practicamente es un boton pero no olkvidar manejarlo para soporte de correos electronicos
+desktop: @https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=933-1194&m=dev
+mobile: @https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=932-630&m=dev
+
+secccion contactarte:
+desktop: @https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=825-3886&m=dev
+mobile: @https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=825-3619&m=dev
+
+seccion: ventajas
+desktop: @https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=937-1687&m=dev
+mobile: @https://www.figma.com/design/gKZZzF8CGKwjrfByWuLyGj/Email-marketing---Reservas?node-id=932-687&m=dev
+
+en @templates/odoo/task-email-2/body.html debe estar agregados despues de <!-- Nuevas secciones crear nueva table si es necesarios-->

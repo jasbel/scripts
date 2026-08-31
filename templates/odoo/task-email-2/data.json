@@ -52,6 +52,14 @@
     "mejor_precio": "/odoo/task-email/assets/icons/mejor_precio.png",
     "opcion_pago": "/odoo/task-email/assets/icons/opcion_pago.png",
     "atencion": "/odoo/task-email/assets/icons/atencion.png",
-    "trustpilot_star": "/odoo/task-email/assets/icons/trustpilot_star.png"
+    "trustpilot_star": "/odoo/task-email/assets/icons/trustpilot_star.png",
+    "language": "/odoo/task-email-2/assets/icons/language.png",
+    "language_28": "/odoo/task-email-2/assets/icons/language_28.png",
+    "globe": "/odoo/task-email-2/assets/icons/globe.png",
+    "trip": "/odoo/task-email-2/assets/icons/trip.png",
+    "celebration": "/odoo/task-email-2/assets/icons/celebration.png",
+    "beach_access": "/odoo/task-email-2/assets/icons/beach_access.png",
+    "dining": "/odoo/task-email-2/assets/icons/dining.png",
+    "local_activity": "/odoo/task-email-2/assets/icons/local_activity.png"
   }
 }
