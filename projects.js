@@ -51,16 +51,20 @@ function readJsonSafe(file) {
   }
 }
 
-/* Todos los templates odoo comparten un unico data.json en templates/odoo/data.json
- * y los assets viven en public/assets (servidos en /assets). */
+/* Todos los templates odoo comparten un unico data.json en <raiz odoo>/data.json
+ * y los assets viven en <raiz odoo>/public/assets (servidos en /assets).
+ * Layout plano: <raiz odoo>/templates/<id>.html (salida del build del repo
+ * externo, ya con includes resueltos). */
 function odooTemplates() {
   const dir = PATHS.odooTemplatesDir;
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => path.join(dir, d.name, 'body.html'))
-    .filter((entry) => fs.existsSync(entry))
-    .map((entry) => ({ id: path.basename(path.dirname(entry)), entry, dataJson: PATHS.odooDataJson }));
+    .filter((d) => d.isFile() && d.name.endsWith('.html'))
+    .map((d) => ({
+      id: d.name.replace(/\.html$/, ''),
+      entry: path.join(dir, d.name),
+      dataJson: PATHS.odooDataJson,
+    }));
 }
 
 export function listProjects() {
@@ -135,9 +139,11 @@ export function watchTargets() {
     targets.push(path.join(solocrucerosDir, '**', '*.mustache'));
   }
   if (fs.existsSync(PATHS.dataJson)) targets.push(PATHS.dataJson);
-  if (fs.existsSync(PATHS.odooTemplatesDir)) {
+  if (fs.existsSync(PATHS.odooRoot)) {
+    // Fuentes del repo externo (cambian -> rebuild externo -> cambia templates/)
+    targets.push(path.join(PATHS.odooRoot, 'src', 'template', '**', '*.html'));
     targets.push(path.join(PATHS.odooTemplatesDir, '**', '*.html'));
-    targets.push(path.join(PATHS.odooTemplatesDir, '**', '*.json'));
+    targets.push(PATHS.odooDataJson);
   }
   return targets;
 }

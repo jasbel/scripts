@@ -10,8 +10,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = process.env.SOLOCRUCEROS_TEMPLATES_DIR
   || '/home/asbel/projects/symfony-sites/sites/solocruceros.com/DDD/4.2MainModule/SoloCrucerosDomain.MainModule/DomainServices/resources/templates/default';
 
-// Plantillas Odoo viven dentro de este repo (multiplataforma)
-const ODOO_TEMPLATES_DIR = path.join(__dirname, 'templates', 'odoo');
+// Raiz del proyecto de plantillas Odoo. Por defecto vive dentro de este repo
+// (templates/odoo); con ODOO_TEMPLATES_DIR apunta a un repo externo con layout:
+//   <raiz>/templates/*.html   plantillas generadas (build del repo externo)
+//   <raiz>/data.json          datos compartidos
+//   <raiz>/public/assets      iconos y banners servidos en /assets
+const ODOO_TEMPLATES_ROOT = process.env.ODOO_TEMPLATES_DIR
+  || path.join(__dirname, 'templates', 'odoo');
 
 export const PATHS = {
   templatesDir: TEMPLATES_DIR,
@@ -19,9 +24,10 @@ export const PATHS = {
   referenceHtml: path.join(TEMPLATES_DIR, 'reserve.html'),
   componentsDir: path.join(TEMPLATES_DIR, 'components'),
   dataJson: path.join(__dirname, 'data.json'),
-  odooTemplatesDir: ODOO_TEMPLATES_DIR,
-  odooDataJson: path.join(ODOO_TEMPLATES_DIR, 'data.json'),
-  publicAssetsDir: path.join(__dirname, 'public', 'assets'),
+  odooRoot: ODOO_TEMPLATES_ROOT,
+  odooTemplatesDir: path.join(ODOO_TEMPLATES_ROOT, 'templates'),
+  odooDataJson: path.join(ODOO_TEMPLATES_ROOT, 'data.json'),
+  odooAssetsDir: path.join(ODOO_TEMPLATES_ROOT, 'public', 'assets'),
   previewHtml: path.join(__dirname, 'preview.html'),
 };
 

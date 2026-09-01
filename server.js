@@ -88,12 +88,12 @@ app.get('/api/templates', (_req, res) => {
   });
 });
 
-/* Assets compartidos de los templates odoo: /assets/<file> desde public/assets.
+/* Assets de los templates odoo: /assets/<file> desde <raiz odoo>/public/assets.
  * Debe ir antes de las rutas genericas /:project/:tpl/render/:client
  * para que "assets" no se interprete como :client. */
 app.get('/assets/*', (req, res) => {
-  const file = path.resolve(PATHS.publicAssetsDir, req.params[0]);
-  if (!file.startsWith(PATHS.publicAssetsDir + path.sep) || !fs.existsSync(file)) {
+  const file = path.resolve(PATHS.odooAssetsDir, req.params[0]);
+  if (!file.startsWith(PATHS.odooAssetsDir + path.sep) || !fs.existsSync(file)) {
     return res.status(404).json({ ok: false, error: 'Asset no encontrado' });
   }
   res.sendFile(file);
