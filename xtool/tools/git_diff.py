@@ -39,7 +39,8 @@ class ChatCompletionChunk:
 client = ZaiClient(api_key=os.getenv("TOKEN_AI"), base_url="https://api.z.ai/api/coding/paas/v4/")
 
 MODELS = [
-  "glm-4.5-air",
+  # "glm-4.5-air",
+  "glm-5.3-flash",
   # "glm-4.5-flash",
   # "glm-5.2",
   # "glm-5.1",
@@ -72,6 +73,7 @@ PRICING_USD_PER_1M = {
   "glm-4.5v": {"input": 0.6, "output": 1.8},
   "glm-ocr": {"input": 0.03, "output": 0.03},
   # ── Next level
+  "glm-5.3-flash": {"input": 0.15, "output": 0.5},
   "glm-5.2": {"input": 1.4, "output": 4.4},
 }
 
