@@ -33,7 +33,7 @@ function makeTransport() {
 
 function splitList(v) {
   if (!v) return undefined;
-  const arr = String(v).split(',').map(s => s.trim()).filter(Boolean);
+  const arr = String(v).split(/[,;\n\r]+/).map(s => s.trim()).filter(Boolean);
   return arr.length ? arr.join(', ') : undefined;
 }
 

@@ -88,6 +88,15 @@ app.get('/api/templates', (_req, res) => {
   });
 });
 
+/* Defaults de envio leidos de .env: prellenan el panel de "Enviar prueba" */
+app.get('/api/send-config', (_req, res) => {
+  res.json({
+    to: SMTP_ENV.to || '',
+    cc: SMTP_ENV.cc || '',
+    subject: SMTP_ENV.subject || '',
+  });
+});
+
 /* Assets de los templates odoo: /assets/<file> desde <raiz odoo>/public/assets.
  * Debe ir antes de las rutas genericas /:project/:tpl/render/:client
  * para que "assets" no se interprete como :client. */
