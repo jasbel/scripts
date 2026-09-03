@@ -34,6 +34,23 @@ xtool                 # lista los comandos disponibles
 xtool kill-port 3000  # ejemplo de uso
 ```
 
+## Emails
+
+`xtool emails` maneja el proyecto de preview de emails que vive en `xtool/emails/`
+(server Express con hot-reload para las plantillas de solocruceros y odoo).
+Requiere node/npm en el PATH; la primera vez instala las dependencias solo.
+
+```bash
+xtool emails                # server de preview con hot-reload (default, puerto 3466)
+xtool emails --port 3500    # server en otro puerto
+xtool emails build          # compila MJML -> HTML una sola vez
+xtool emails watch          # compila MJML y recompila al guardar
+xtool emails extract        # extrae datos del HTML de referencia a data.json
+```
+
+Configuración del proyecto (rutas de templates, SMTP para envíos de prueba)
+en `xtool/emails/.env` — ver `xtool/emails/.env.example`.
+
 ## Actualizar / desinstalar
 
 ```bash
