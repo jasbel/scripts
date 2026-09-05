@@ -104,8 +104,54 @@ Reglas:
 """
 
 
+def _copy_windows(texto):
+  ctypes = __import__("ctypes")
+  from ctypes import wintypes
+
+  CF_UNICODETEXT = 13
+  GMEM_MOVEABLE = 0x0002
+
+  kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+  user32 = ctypes.WinDLL("user32", use_last_error=True)
+
+  kernel32.GlobalAlloc.restype = ctypes.c_void_p
+  kernel32.GlobalAlloc.argtypes = (wintypes.UINT, ctypes.c_size_t)
+  kernel32.GlobalLock.restype = ctypes.c_void_p
+  kernel32.GlobalLock.argtypes = (ctypes.c_void_p,)
+  kernel32.GlobalUnlock.argtypes = (ctypes.c_void_p,)
+  kernel32.GlobalFree.restype = ctypes.c_void_p
+  kernel32.GlobalFree.argtypes = (ctypes.c_void_p,)
+  user32.SetClipboardData.restype = ctypes.c_void_p
+  user32.SetClipboardData.argtypes = (wintypes.UINT, ctypes.c_void_p)
+
+  data = ctypes.create_unicode_buffer(texto + "\0")
+  size = ctypes.sizeof(data)
+
+  h_global = kernel32.GlobalAlloc(GMEM_MOVEABLE, size)
+  if not h_global:
+    return False
+  locked = kernel32.GlobalLock(h_global)
+  if not locked:
+    kernel32.GlobalFree(h_global)
+    return False
+  ctypes.memmove(locked, data, size)
+  kernel32.GlobalUnlock(h_global)
+
+  if not user32.OpenClipboard(None):
+    kernel32.GlobalFree(h_global)
+    return False
+  try:
+    user32.EmptyClipboard()
+    if user32.SetClipboardData(CF_UNICODETEXT, h_global):
+      return True
+    kernel32.GlobalFree(h_global)
+    return False
+  finally:
+    user32.CloseClipboard()
+
+
 def copy_to_clipboard(texto):
-  """Copia texto al portapapeles compatible con Ubuntu y macOS."""
+  """Copia texto al portapapeles compatible con Ubuntu, macOS y Windows."""
   try:
     system = platform.system()
     submethod = ""
@@ -122,6 +168,11 @@ def copy_to_clipboard(texto):
     elif system == "Darwin":
       subprocess.run(["pbcopy"], input=texto.encode("utf-8"), check=True)
       submethod = "(pbcopy)"
+    elif system == "Windows":
+      if _copy_windows(texto):
+        submethod = "(win32)"
+      else:
+        print("Error: No se pudo acceder al portapapeles de Windows")
     else:
       print(f"Error: Sistema operativo no soportado: {system}")
 
