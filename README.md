@@ -55,9 +55,10 @@ en `xtool/emails/.env` — ver `xtool/emails/.env.example`.
 
 `xtool git-cherry <ruta_repo_origen> <hash_commit>` transporta un commit de otro
 repositorio local al repo del directorio actual, dejando los cambios en staging
-sin commitear (revisa con `git diff --cached`). Usa un remote temporal que
-remueve al terminar y resuelve los conflictos modify/delete cross-repo mapeando
-la ruta sin su primer componente.
+sin commitear (revisa con `git diff --cached`). La ruta de origen puede ser un
+subdirectorio del repo (se resuelve a su raíz). Hace un fetch mínimo por SHA
+usando un remote temporal que remueve al terminar, y resuelve los conflictos
+modify/delete cross-repo mapeando la ruta al sufijo que exista en el destino.
 
 ## Actualizar / desinstalar
 
