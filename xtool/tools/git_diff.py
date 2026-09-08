@@ -192,22 +192,24 @@ def copy_to_clipboard(texto):
 
 def get_git_diff():
   try:
+    git_diff_command = [
+      "git",
+      "diff",
+      "--cached",
+      "-U1",
+      "--",
+      ".",
+      ":(exclude)*.yaml",
+      ":(exclude)*.yml",
+      ":(exclude)*.json",
+      ":(exclude).gitignore",
+      ":(exclude)git_diff.ts",
+      ":(exclude)git_diff.py",
+      ":(exclude)test.py",
+    ]
+    print("Ejecutando comando git diff:", " ".join(git_diff_command))
     result = subprocess.run(
-      [
-        "git",
-        "diff",
-        "--cached",
-        "-U1",
-        "--",
-        ".",
-        ":(exclude)*.yaml",
-        ":(exclude)*.yml",
-        ":(exclude)*.json",
-        ":(exclude).gitignore",
-        ":(exclude)git_diff.ts",
-        ":(exclude)git_diff.py",
-        ":(exclude)test.py",
-      ],
+      git_diff_command,
       capture_output=True,
       text=True,
     )
