@@ -8,6 +8,10 @@ Requisitos:
   - Estar en un repo git con cambios staged (git add)
   - TOKEN_AI en el .env del proyecto o del arsenal
 
+El diff se limita a 1M de caracteres: se excluyen lockfiles, binarios y
+generados y, si aun así supera el límite, se trunca por archivo dejando un
+resumen de lo omitido.
+
 El commit ganador se copia al portapapeles.
 """
 
@@ -103,6 +107,73 @@ Reglas:
 - Ignora cambios de archivos .json, .yml .gitignore.
 """
 
+MAX_DIFF_CHARS = 1_000_000
+MIN_CHUNK_CHARS = 5_000
+TAIL_MAX_LINES = 40
+MARKER_RESERVE = 256
+
+GIT_DIFF_FLAGS = [
+  "-U1",
+  "--diff-algorithm=histogram",
+  "--indent-heuristic",
+  "--ignore-cr-at-eol",
+  "--ignore-blank-lines",
+  "--find-renames=50%",
+  "--ignore-submodules=all",
+  "--no-ext-diff",
+  "--no-color",
+]
+
+ORIGINAL_EXCLUDES = [
+  ":(exclude)*.yaml",
+  ":(exclude)*.yml",
+  ":(exclude)*.json",
+  ":(exclude).gitignore",
+  ":(exclude)git_diff.ts",
+  ":(exclude)*/git_diff.ts",
+  ":(exclude)git_diff.py",
+  ":(exclude)*/git_diff.py",
+  ":(exclude)test.py",
+  ":(exclude)*/test.py",
+]
+
+BASE_EXCLUDE_PATTERNS = [
+  r"\.lock$",
+  r"\.sum$",
+  r"(^|/)vendor/",
+  r"(^|/)target/",
+  r"(^|/)out/",
+  r"(^|/)\.next/",
+  r"(^|/)\.nuxt/",
+  r"(^|/)\.output/",
+  r"(^|/)node_modules/",
+  r"(^|/)__pycache__/",
+  r"\.pyc$",
+  r"\.min\.js$",
+  r"\.min\.css$",
+  r"\.map$",
+  r"\.snap$",
+  r"(^|/)__snapshots__/",
+  r"_pb2\.py$",
+  r"\.pb\.go$",
+  r"\.generated\.",
+  r"\.(png|jpe?g|gif|webp|ico|pdf|zip|woff2?|ttf|mp4)$",
+  r"\.(csv|tsv|xlsx)$",
+  r"(^|/)\.idea/",
+  r"(^|/)\.vscode/",
+  r"(^|/)\.DS_Store$",
+  r"\.swp$",
+]
+
+ROUND1_EXCLUDE_PATTERNS = [r"\.md$", r"^package[^/]*\.json$", r"(^|/)build/", r"(^|/)dist/"]
+CSS_EXCLUDE_PATTERN = r"\.css$"
+SCSS_PATTERN = r"\.scss$"
+
+BASE_EXCLUDE_RE = [re.compile(p) for p in BASE_EXCLUDE_PATTERNS]
+ROUND1_EXCLUDE_RE = [re.compile(p) for p in ROUND1_EXCLUDE_PATTERNS]
+CSS_EXCLUDE_RE = [re.compile(CSS_EXCLUDE_PATTERN)]
+SCSS_RE = re.compile(SCSS_PATTERN)
+
 
 def _copy_windows(texto):
   ctypes = __import__("ctypes")
@@ -190,34 +261,270 @@ def copy_to_clipboard(texto):
     return False
 
 
-def get_git_diff():
+def _clean_path(raw):
+  p = raw.strip().strip('"')
+  if p.startswith(("a/", "b/")):
+    return p[2:]
+  return p
+
+
+def _chunk_path(lines):
+  fallback = None
+  for line in lines[:12]:
+    s = line.rstrip("\n")
+    if s.startswith("+++ "):
+      p = _clean_path(s[4:])
+      if p != "/dev/null":
+        return p
+    elif s.startswith("--- "):
+      p = _clean_path(s[4:])
+      if p != "/dev/null":
+        fallback = p
+    elif s.startswith("rename to "):
+      fallback = s[10:].strip().strip('"')
+  if fallback is None and lines:
+    header = lines[0].rstrip("\n")
+    if header.startswith("diff --git "):
+      rest = header[11:]
+      m = re.match(r'^"a/(.+)"\s+"b/(.+)"$', rest)
+      if not m:
+        m = re.match(r"^a/(.+) b/(.+)$", rest)
+      if m:
+        return m.group(2)
+  return fallback
+
+
+def _split_chunks(diff_text):
+  chunks = []
+  current = None
+  for line in diff_text.splitlines(keepends=True):
+    if line.startswith("diff --git "):
+      if current:
+        chunks.append(current)
+      current = {"lines": [line], "text": "", "path": None}
+    elif current is not None:
+      current["lines"].append(line)
+  if current:
+    chunks.append(current)
+  for c in chunks:
+    c["text"] = "".join(c["lines"])
+    c["path"] = _chunk_path(c["lines"])
+  return chunks
+
+
+def _match_any(path, regexes):
+  return any(r.search(path) for r in regexes)
+
+
+def _partition(chunks, regexes):
+  keep, dropped = [], []
+  for c in chunks:
+    if c["path"] and _match_any(c["path"], regexes):
+      dropped.append(c)
+    else:
+      keep.append(c)
+  return keep, dropped
+
+
+def _truncate_chunk(chunk, budget):
+  used = 0
+  out = []
+  for i, line in enumerate(chunk["lines"]):
+    if i > 0 and used + len(line) > budget:
+      break
+    out.append(line)
+    used += len(line)
+  omitted = len(chunk["text"]) - used
+  if omitted > 0:
+    out.append(f"\n[... diff truncado: {omitted} de {len(chunk['text'])} chars omitidos en {chunk['path'] or 'archivo'} ...]\n")
+  return "".join(out), omitted
+
+
+def _fit_chunks(chunks, budget):
+  full, big = [], []
+  total = 0
+  for c in chunks:
+    if total + len(c["text"]) <= budget:
+      full.append(c)
+      total += len(c["text"])
+    else:
+      big.append(c)
+  truncated, omitted = [], []
+  for c in big:
+    avail = budget - total
+    if avail < MIN_CHUNK_CHARS:
+      omitted.append(c)
+      continue
+    text, om = _truncate_chunk(c, avail - MARKER_RESERVE)
+    truncated.append({"path": c["path"], "omitted": om, "text": text, "kept": len(text), "total": len(c["text"])})
+    total += len(text)
+  return full, truncated, omitted
+
+
+def _compact_stats(paths):
+  if not paths:
+    return []
   try:
-    git_diff_command = [
-      "git",
-      "diff",
-      "--cached",
-      "-U1",
-      "--",
-      ".",
-      ":(exclude)*.yaml",
-      ":(exclude)*.yml",
-      ":(exclude)*.json",
-      ":(exclude).gitignore",
-      ":(exclude)git_diff.ts",
-      ":(exclude)git_diff.py",
-      ":(exclude)test.py",
-    ]
-    print("Ejecutando comando git diff:", " ".join(git_diff_command))
-    result = subprocess.run(
-      git_diff_command,
+    proc = subprocess.run(
+      ["git", "diff", "--cached", "--compact-summary", "--", ".", *ORIGINAL_EXCLUDES],
       capture_output=True,
       text=True,
     )
-    if result.returncode != 0:
-      return None
-    return result.stdout
   except Exception:
-    return None
+    return []
+  if proc.returncode != 0:
+    return []
+  stats = {}
+  for line in proc.stdout.splitlines():
+    if " | " not in line:
+      continue
+    raw = line.split(" | ")[0].strip()
+    p = re.sub(r"\s*\([^)]*\)$", "", raw)
+    stats[p] = line
+  return [stats[p] for p in paths if p in stats]
+
+
+def _build_tail(paths):
+  lines = _compact_stats([p for p in paths if p])
+  if not lines:
+    return ""
+  shown = lines[:TAIL_MAX_LINES]
+  tail = "[Resumen de archivos excluidos o truncados del diff:]\n" + "\n".join(shown)
+  if len(lines) > TAIL_MAX_LINES:
+    tail += f"\n[+ {len(lines) - TAIL_MAX_LINES} archivos más]"
+  return "\n" + tail + "\n"
+
+
+def _fmt_size(n):
+  if n >= 1_048_576:
+    return f"{n / 1_048_576:.2f} MB"
+  if n >= 1024:
+    return f"{n / 1024:.1f} KB"
+  return f"{n} B"
+
+
+def _fmt_thousands(n):
+  return f"{n:,}".replace(",", ".")
+
+
+def _add_stage(stages, label, before, after, files_before, files_after, dropped, truncated=None):
+  stages.append({
+    "label": label,
+    "before": before,
+    "after": after,
+    "files_before": files_before,
+    "files_after": files_after,
+    "dropped": [(c["path"], len(c["text"])) for c in dropped],
+    "truncated": truncated or [],
+  })
+
+
+def get_git_diff():
+  meta = {
+    "error": None,
+    "empty_reason": None,
+    "original_chars": 0,
+    "command": "",
+    "raw_files": 0,
+    "rounds": [],
+    "retry": False,
+    "excluded_files": [],
+    "truncated_files": [],
+    "omitted_files": [],
+    "stages": [],
+    "tail_chars": 0,
+  }
+  cmd = ["git", "diff", "--cached", *GIT_DIFF_FLAGS, "--", ".", *ORIGINAL_EXCLUDES]
+  meta["command"] = " ".join(cmd)
+  try:
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+  except Exception as e:
+    meta["error"] = f"No se pudo ejecutar git: {e}"
+    return None, meta
+
+  if proc.returncode != 0:
+    meta["error"] = f"git diff falló ({proc.returncode}): {proc.stderr.strip()}"
+    return None, meta
+
+  raw = proc.stdout
+  meta["original_chars"] = len(raw)
+
+  if not raw.strip():
+    check = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True)
+    meta["empty_reason"] = "all_excluded" if (check.returncode == 0 and check.stdout.strip()) else "no_staged"
+    return None, meta
+
+  chunks = _split_chunks(raw)
+  meta["raw_files"] = len(chunks)
+  stages = []
+
+  keep, dropped = _partition(chunks, BASE_EXCLUDE_RE)
+  meta["excluded_files"] = [c["path"] for c in dropped]
+  total = sum(len(c["text"]) for c in keep)
+  _add_stage(stages, "base: lockfiles, binarios, generados, build, IDE/OS", meta["original_chars"], total, len(chunks), len(keep), dropped)
+  rounds = []
+
+  if keep and total > MAX_DIFF_CHARS:
+    kept1, drop1 = _partition(keep, ROUND1_EXCLUDE_RE)
+    if kept1:
+      rounds.append(1)
+      after1 = sum(len(c["text"]) for c in kept1)
+      _add_stage(stages, "ronda 1: *.md, package*.json, build/, dist/", total, after1, len(keep), len(kept1), drop1)
+      meta["excluded_files"] += [c["path"] for c in drop1]
+      keep = kept1
+      total = after1
+      if total > MAX_DIFF_CHARS and any(c["path"] and SCSS_RE.search(c["path"]) for c in keep):
+        kept2, drop2 = _partition(keep, CSS_EXCLUDE_RE)
+        if kept2:
+          rounds.append(2)
+          after2 = sum(len(c["text"]) for c in kept2)
+          _add_stage(stages, "ronda 2: *.css (cambios .scss detectados)", total, after2, len(keep), len(kept2), drop2)
+          meta["excluded_files"] += [c["path"] for c in drop2]
+          keep = kept2
+          total = after2
+
+  if not keep:
+    meta["retry"] = True
+    meta["excluded_files"] = []
+    keep = chunks
+    total = sum(len(c["text"]) for c in chunks)
+    _add_stage(stages, "reintento: exclusiones desactivadas (el filtrado eliminó todos los archivos)", meta["original_chars"], total, len(chunks), len(chunks), [])
+
+  if total > MAX_DIFF_CHARS:
+    rounds.append(3)
+    pre_tail = _build_tail(meta["excluded_files"])
+    full, truncated, omitted = _fit_chunks(keep, MAX_DIFF_CHARS - len(pre_tail) - MARKER_RESERVE)
+    body = sum(len(c["text"]) for c in full) + sum(len(t["text"]) for t in truncated)
+    _add_stage(
+      stages,
+      "ronda 3: truncado por archivo",
+      total,
+      body,
+      len(keep),
+      len(full) + len(truncated),
+      omitted,
+      truncated=[{"path": t["path"], "kept": t["kept"], "total": t["total"], "omitted": t["omitted"]} for t in truncated],
+    )
+  else:
+    full, truncated, omitted = keep, [], []
+
+  meta["rounds"] = rounds
+  meta["truncated_files"] = [{"path": t["path"], "omitted": t["omitted"], "kept": t["kept"], "total": t["total"]} for t in truncated]
+  meta["omitted_files"] = [c["path"] for c in omitted]
+
+  tail = ""
+  tail_paths = list(meta["excluded_files"]) + list(meta["omitted_files"]) + [t["path"] for t in truncated]
+  if tail_paths:
+    tail = _build_tail(tail_paths)
+
+  final = "".join([c["text"] for c in full] + [t["text"] for t in truncated]) + tail
+  while len(final) > MAX_DIFF_CHARS and "\n" in tail:
+    tail = tail[: tail.rfind("\n")]
+    final = "".join([c["text"] for c in full] + [t["text"] for t in truncated]) + tail
+  meta["tail_chars"] = len(tail)
+  meta["stages"] = stages
+
+  return final, meta
 
 
 def parse_response(respuesta):
@@ -331,15 +638,35 @@ def main(argv=None):
   start_time = time.perf_counter()
 
   t_diff = time.perf_counter()
-  diff = get_git_diff()
+  diff, meta = get_git_diff()
   print(f"Tiempo obtención git diff: {(time.perf_counter() - t_diff):.4f}s")
 
-  if not diff or diff.strip() == "":
-    print("No hay cambios pendientes en git")
+  if diff is None:
+    if meta["error"]:
+      print(f"Error al obtener git diff: {meta['error']}")
+    elif meta["empty_reason"] == "all_excluded":
+      print("Solo hay cambios en archivos excluidos (json, lockfiles, generados). No hay nada para analizar")
+    else:
+      print("No hay cambios pendientes en git")
     return
 
-  diff_bytes = len(diff.encode("utf-8"))
-  print(f"Tamaño del diff: {(diff_bytes / 1024):.2f} KB ({len(diff)} chars)\n")
+  print("\n========== CAPTURA DEL DIFF ==========")
+  print(f"Comando: {meta['command']}")
+  print(f"Archivos en diff: {meta['raw_files']} · original: {_fmt_thousands(meta['original_chars'])} chars ({_fmt_size(meta['original_chars'])})")
+
+  for i, st in enumerate(meta["stages"], 1):
+    print(f"\n[{i}] {st['label']}")
+    print(f"    {_fmt_thousands(st['before'])} → {_fmt_thousands(st['after'])} chars · archivos: {st['files_before']} → {st['files_after']}")
+    for p, ch in st["dropped"][:15]:
+      print(f"    - {p} ({_fmt_size(ch)})")
+    if len(st["dropped"]) > 15:
+      print(f"    - ... y {len(st['dropped']) - 15} archivos más")
+    for t in st["truncated"]:
+      pct = (t["kept"] / t["total"] * 100) if t["total"] else 0
+      print(f"    ~ {t['path']}: {_fmt_size(t['kept'])} de {_fmt_size(t['total'])} ({pct:.0f}% · {_fmt_thousands(t['omitted'])} chars omitidos)")
+
+  pct_final = len(diff) / MAX_DIFF_CHARS * 100
+  print(f"\nFINAL: {_fmt_thousands(len(diff))} / {_fmt_thousands(MAX_DIFF_CHARS)} chars ({_fmt_size(len(diff))} · {pct_final:.1f}% del presupuesto · cola: {_fmt_thousands(meta['tail_chars'])} chars)\n")
 
   results = []
   for model in MODELS:

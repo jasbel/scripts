@@ -51,6 +51,14 @@ xtool emails extract        # extrae datos del HTML de referencia a data.json
 Configuración del proyecto (rutas de templates, SMTP para envíos de prueba)
 en `xtool/emails/.env` — ver `xtool/emails/.env.example`.
 
+## git-cherry
+
+`xtool git-cherry <ruta_repo_origen> <hash_commit>` transporta un commit de otro
+repositorio local al repo del directorio actual, dejando los cambios en staging
+sin commitear (revisa con `git diff --cached`). Usa un remote temporal que
+remueve al terminar y resuelve los conflictos modify/delete cross-repo mapeando
+la ruta sin su primer componente.
+
 ## Actualizar / desinstalar
 
 ```bash
