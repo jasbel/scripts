@@ -71,6 +71,28 @@ Hace un fetch mínimo por SHA con un remote temporal que remueve al terminar, y
 resuelve los conflictos modify/delete cross-repo mapeando la ruta al sufijo que
 exista en el destino.
 
+## Autocompletado (bash)
+
+El script `completions/xtool.bash` agrega autocompletado con TAB:
+
+- `xtool <TAB>` — lista los comandos disponibles (se genera dinámicamente
+  parseando la salida de `xtool`, así que los tools nuevos de `xtool/tools/`
+  autocompletean sin tocar el script).
+- `xtool help <TAB>` — los mismos comandos.
+- `xtool emails <TAB>` — subcomandos (`server build watch extract`) y
+  `xtool emails -<TAB>` — flags (`--port --no-install -h --help`).
+- `xtool git-cherry <TAB>` — directorios (ruta del repo origen).
+
+Activación: agregar al final del `~/.bashrc` (ajustar la ruta si el repo
+vive en otro lugar):
+
+```bash
+source ~/projects/scripts/completions/xtool.bash
+```
+
+Y recargar la sesión (`source ~/.bashrc` o abrir terminal nueva). Para que
+la completación dinámica funcione, `xtool` debe estar instalado y en el PATH.
+
 ## Actualizar / desinstalar
 
 ```bash

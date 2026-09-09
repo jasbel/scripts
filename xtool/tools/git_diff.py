@@ -595,7 +595,8 @@ def analizer_changes(diff, model):
       if chunk.choices and chunk.choices[0].delta.content:
         if t_first_token is None:
           t_first_token = time.perf_counter()
-          print(f"   -> Primer token: {(t_first_token - t_start):.2f}s")
+          print(f"   -> Primer token: {(t_first_token - t_start):.2f}s \n")
+          print(f"=============================================\n")
         content = chunk.choices[0].delta.content
         print(content, end="", flush=True)
         respuesta += content
@@ -607,6 +608,7 @@ def analizer_changes(diff, model):
           reasoning_tokens = getattr(details, "reasoning_tokens", 0) or 0
 
     total_ms = (time.perf_counter() - t_start) * 1000
+    print(f"\n=============================================")
     print(f"\n   -> Stream completo: {(total_ms / 1000):.2f}s")
     print(f"   -> Tokens: prompt={prompt_tokens}, completion={completion_tokens}, reasoning={reasoning_tokens}")
 
@@ -633,7 +635,6 @@ def analizer_changes(diff, model):
       "reasoning_tokens": 0,
       "error": msg,
     }
-
 
 def main(argv=None):
   start_time = time.perf_counter()
@@ -675,7 +676,9 @@ def main(argv=None):
     result = analizer_changes(diff, model)
     results.append(result)
 
-  print("\n\n========== RESUMEN COMPARATIVO ==========")
+
+
+  # print("\n\n========== RESUMEN COMPARATIVO ==========")
 
   scored = []
   for r in results:
@@ -686,37 +689,40 @@ def main(argv=None):
     quality, checks = score_quality(r["output"])
     scored.append({**r, "cost": cost, "quality": quality, "checks": checks})
 
-  header = "Modelo".ljust(16) + " | " + "1er token".rjust(9) + " | " + "Total".rjust(8) + " | " + "Tokens i/o".rjust(14) + " | " + "Costo".rjust(8) + " | " + "Calidad".rjust(7) + " | " + "Score".rjust(6)
-  print(header)
-  print("-" * 85)
+  # header = "Modelo".ljust(16) + " | " + "1er token".rjust(9) + " | " + "Total".rjust(8) + " | " + "Tokens i/o".rjust(14) + " | " + "Costo".rjust(8) + " | " + "Calidad".rjust(7) + " | " + "Score".rjust(6)
+  # print(header)
+  # print("-" * 85)
 
-  max_time = max((s["total_ms"] for s in scored), default=1) or 1
-  max_cost = max((s["cost"] for s in scored), default=0.0001) or 0.0001
+  # max_time = max((s["total_ms"] for s in scored), default=1) or 1
+  # max_cost = max((s["cost"] for s in scored), default=0.0001) or 0.0001
 
-  for s in scored:
-    t_score = 1 - s["total_ms"] / max_time
-    c_score = 1 - s["cost"] / max_cost
-    s["combined"] = t_score * 0.25 + c_score * 0.25 + s["quality"] * 0.5
+  # for s in scored:
+  #   t_score = 1 - s["total_ms"] / max_time
+  #   c_score = 1 - s["cost"] / max_cost
+  #   s["combined"] = t_score * 0.25 + c_score * 0.25 + s["quality"] * 0.5
 
-  scored.sort(key=lambda s: s["combined"], reverse=True)
+  # scored.sort(key=lambda s: s["combined"], reverse=True)
 
-  for s in scored:
-    first = "N/A" if s["first_token_ms"] is None else f"{s['first_token_ms'] / 1000:.2f}s"
-    print(
-      s["model"].ljust(16)
-      + " | "
-      + first.rjust(9)
-      + " | "
-      + f"{s['total_ms'] / 1000:.2f}s".rjust(8)
-      + " | "
-      + f"{s['prompt_tokens']}/{s['completion_tokens']}".rjust(14)
-      + " | "
-      + f"${s['cost']:.5f}".rjust(8)
-      + " | "
-      + f"{s['quality'] * 100:.0f}%".rjust(7)
-      + " | "
-      + f"{s['combined'] * 100:.0f}".rjust(6),
-    )
+  # for s in scored:
+  #   first = "N/A" if s["first_token_ms"] is None else f"{s['first_token_ms'] / 1000:.2f}s"
+  #   print(
+  #     s["model"].ljust(16)
+  #     + " | "
+  #     + first.rjust(9)
+  #     + " | "
+  #     + f"{s['total_ms'] / 1000:.2f}s".rjust(8)
+  #     + " | "
+  #     + f"{s['prompt_tokens']}/{s['completion_tokens']}".rjust(14)
+  #     + " | "
+  #     + f"${s['cost']:.5f}".rjust(8)
+  #     + " | "
+  #     + f"{s['quality'] * 100:.0f}%".rjust(7)
+  #     + " | "
+  #     + f"{s['combined'] * 100:.0f}".rjust(6),
+  #   )
+
+
+
 
   print("\n--- Detalle de calidad por modelo ---")
   for s in scored:
@@ -728,19 +734,19 @@ def main(argv=None):
     pass
   elif len(results) == 1:
     best = scored[0]
-    print(f"\nScore combinado: {best['combined'] * 100:.0f}/100")
+    # print(f"\nScore combinado: {best['combined'] * 100:.0f}/100")
     commit, summary = parse_response(best["output"])
     copy_to_clipboard(commit)
-    if summary:
-      print(f"\n{summary}\n")
+    # if summary:
+    #   print(f"\n{summary}\n")
   elif len(results) > 1:
     best = scored[0]
-    print(f"\nGanador global: {best['model']} (score {best['combined']:.2f})")
-    print("Pesos: tiempo 25% · costo 25% · calidad 50%")
+    # print(f"\nGanador global: {best['model']} (score {best['combined']:.2f})")
+    # print("Pesos: tiempo 25% · costo 25% · calidad 50%")
     commit, summary = parse_response(best["output"])
     copy_to_clipboard(commit)
-    if summary:
-      print(f"\n{summary}\n")
+    # if summary:
+    #   print(f"\n{summary}\n")
 
   elapsed = time.perf_counter() - start_time
   print(f"\nTIEMPO TOTAL SCRIPT: {elapsed:.2f}s")
