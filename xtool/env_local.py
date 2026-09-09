@@ -59,12 +59,3 @@ def load_env(filepath=None):
 
 
 load_env()
-
-BARIK_APP_DIR = os.environ.get("BARIK_APP_DIR", "/")
-APPIUM_BARIK_DIR = os.environ.get("APPIUM_BARIK_DIR", "/")
-NODE_ID = os.environ.get("NODE_ID", "NODE_ID")
-JWT_SECRET = os.environ.get("JWT_SECRET", "JWT_SECRET")
-
-
-def get_env():
-  return cast(Literal["local", "docker"], os.environ.get("ENV", "local"))
