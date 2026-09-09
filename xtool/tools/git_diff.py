@@ -248,7 +248,8 @@ def copy_to_clipboard(texto):
       print(f"Error: Sistema operativo no soportado: {system}")
 
     if submethod:
-      output = f"Copiado a portapapeles {submethod}\n===========\n\n{texto}\n\n===========\n"
+      # output = f"Copiado a portapapeles {submethod}\n===========\n\n{texto}\n\n===========\n"
+      output = f"Copiado a portapapeles {submethod}"
       print(output)
 
     return submethod or False
