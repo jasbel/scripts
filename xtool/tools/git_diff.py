@@ -107,6 +107,9 @@ Reglas:
 - Ignora cambios de archivos .json, .yml .gitignore.
 """
 
+# Nivel de razonamiento del modelo: low | high | max (la API usa max por defecto)
+MODEL_VARIANT = "low"
+
 MAX_DIFF_CHARS = 1_000_000
 MIN_CHUNK_CHARS = 5_000
 TAIL_MAX_LINES = 40
@@ -129,10 +132,10 @@ ORIGINAL_EXCLUDES = [
   ":(exclude)*.yml",
   ":(exclude)*.json",
   ":(exclude).gitignore",
-  ":(exclude)git_diff.ts",
-  ":(exclude)*/git_diff.ts",
-  ":(exclude)git_diff.py",
-  ":(exclude)*/git_diff.py",
+  # ":(exclude)git_diff.ts",
+  # ":(exclude)*/git_diff.ts",
+  # ":(exclude)git_diff.py",
+  # ":(exclude)*/git_diff.py",
   ":(exclude)test.py",
   ":(exclude)*/test.py",
 ]
@@ -586,7 +589,7 @@ def analizer_changes(diff, model):
       ],
       stream=True,
       thinking={"type": "disabled"},
-      extra_body={"stream_options": {"include_usage": True}},
+      extra_body={"stream_options": {"include_usage": True}, "variant": MODEL_VARIANT},
     )
 
     respuesta = ""
