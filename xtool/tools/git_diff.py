@@ -373,6 +373,8 @@ def _compact_stats(paths):
       ["git", "diff", "--cached", "--compact-summary", "--", ".", *ORIGINAL_EXCLUDES],
       capture_output=True,
       text=True,
+      encoding="utf-8",
+      errors="replace",
     )
   except Exception:
     return []
@@ -441,7 +443,7 @@ def get_git_diff():
   cmd = ["git", "diff", "--cached", *GIT_DIFF_FLAGS, "--", ".", *ORIGINAL_EXCLUDES]
   meta["command"] = " ".join(cmd)
   try:
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
   except Exception as e:
     meta["error"] = f"No se pudo ejecutar git: {e}"
     return None, meta
@@ -454,7 +456,7 @@ def get_git_diff():
   meta["original_chars"] = len(raw)
 
   if not raw.strip():
-    check = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True)
+    check = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     meta["empty_reason"] = "all_excluded" if (check.returncode == 0 and check.stdout.strip()) else "no_staged"
     return None, meta
 
