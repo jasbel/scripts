@@ -11,6 +11,8 @@ Uso:
 Flags:
   --port <n>    puerto del server (solo aplica al server)
   --no-install  no ejecutar npm install aunque falte node_modules
+  (resto de argumentos se pasan al subcomando, p.ej.
+   "xtool emails dist --data data.real.json")
 
 Requisito: node/npm en el PATH. La primera vez instala dependencias solo.
 """
@@ -93,7 +95,7 @@ def main(argv=None):
     env["PORT"] = port
 
   try:
-    return subprocess.call(COMMANDS[sub], cwd=EMAILS_DIR, env=env)
+    return subprocess.call(COMMANDS[sub] + positional[1:], cwd=EMAILS_DIR, env=env)
   except KeyboardInterrupt:
     return 0
 
