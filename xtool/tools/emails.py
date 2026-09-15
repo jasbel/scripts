@@ -5,6 +5,7 @@ Uso:
   xtool emails build          # compila MJML -> HTML una sola vez
   xtool emails watch          # compila MJML y recompila al guardar
   xtool emails extract        # extrae datos del HTML de referencia a data.json
+  xtool emails dist           # renderiza plantillas odoo con data.json -> dist/
   xtool emails --port 3500    # server en otro puerto (default: 3466)
 
 Flags:
@@ -27,6 +28,7 @@ COMMANDS = {
   "build": ["node", "mjml-build.js"],
   "watch": ["node", "mjml-build.js", "--watch"],
   "extract": ["node", "extract.js"],
+  "dist": ["node", "dist.js"],
 }
 
 
