@@ -20,7 +20,7 @@ const ODOO_TEMPLATES_ROOT = process.env.ODOO_TEMPLATES_DIR
 
 export const PATHS = {
   templatesDir: TEMPLATES_DIR,
-  mustache: path.join(TEMPLATES_DIR, 'reserve.mustache'),
+  mustache: path.join(TEMPLATES_DIR, 'reserve-new.mustache'),
   referenceHtml: path.join(TEMPLATES_DIR, 'reserve.html'),
   componentsDir: path.join(TEMPLATES_DIR, 'components'),
   dataJson: path.join(__dirname, 'data.json'),

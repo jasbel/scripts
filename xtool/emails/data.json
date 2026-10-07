@@ -242,6 +242,7 @@
   ],
   "urlReserve": "https://apisandbox.solocruceros.com/reserve/template?code=WlJaaXppNVExQ3pDd1c0U2RNeHVPMXZyVkhRQk0wMk1naVBHRmtVZUxQNHNQcDlmWWx6SFhLWVhhTjl6NFFrVA==",
   "cruiseLogo": "https://media.solocruceros.com/media/cruise_lines/COSTA/file_logo?date=20230206211159",
+  "mailDocumentName": "{{mailDocumentName}}",
 
   "departurePort": "Barcelona",
   "arrivalPort": "Barcelona",
