@@ -53,7 +53,7 @@ en `xtool/emails/.env` — ver `xtool/emails/.env.example`.
 
 ## git-cherry
 
-`xtool git-cherry [ruta_repo_origen] [hash_commit>` transporta un commit de otro
+`xtool git-cherry [ruta_repo_origen] [hash_commit]` transporta un commit de otro
 repositorio local al repo del directorio actual, dejando los cambios en staging
 sin commitear (revisa con `git diff --cached`).
 
@@ -67,7 +67,30 @@ Ambos argumentos son opcionales:
   repo) → error "no hay información de cambios". Los untracked de un
   `stash -u` también se transportan.
 
-Hace un fetch mínimo por SHA con un remote temporal que remueve al terminar, y
+### Modo acotado (origen = subdirectorio)
+
+Si la ruta del origen es un subdirectorio del repo origen (p.ej.
+`.../Web/symfony_home`), solo se transportan los cambios bajo ese
+subdirectorio y se mapean de forma determinista al subdirectorio del repo
+destino donde se ejecuta el comando (p.ej. `.../Web/symfony_chile`):
+
+```
+<origen_sub>/ruta/archivo  ->  <destino_sub>/ruta/archivo
+```
+
+Se aplica archivo por archivo con `git apply -3` (sin detección de renombres),
+así que en un monorepo con varias apps parecidas git no puede "adivinar" y
+esparcir cambios en apps no deseadas. Si un diff no aplica limpio: archivo
+inexistente en destino → se agrega completo; conflicto → queda como merge
+conflict real (unmerged: `git status` lo muestra y se lista con
+`git diff --name-only --diff-filter=U`; resuelve editando + `git add`, o
+`git checkout --ours/--theirs`); si no, la versión del origen queda como
+`<ruta>.desde_origen`.
+
+### Modo repo completo (origen = raíz del repo)
+
+Hace un fetch mínimo por SHA con un remote temporal que remueve al terminar,
+cherry-pick `-n -Xno-renames` (sin renombres: nada se reubica por similitud) y
 resuelve los conflictos modify/delete cross-repo mapeando la ruta al sufijo que
 exista en el destino.
 
