@@ -59,13 +59,34 @@ sin commitear (revisa con `git diff --cached`).
 
 Ambos argumentos son opcionales:
 
-- **ruta_repo_origen**: si no se envía, se toma de la variable
-  `GIT_CHERRY_ORIGEN` (entorno o `.env`, ej. el `.env` del arsenal con la ruta
-  del monorepo de origen). Puede ser cualquier subdirectorio del repo origen.
+- **ruta_repo_origen**: si no se envía, se toma del origen por defecto, con
+  esta prioridad: override temporal de `git-cherry-origin` (vigente) >
+  variable `GIT_CHERRY_ORIGEN` (entorno o `.env`, ej. el `.env` del arsenal
+  con la ruta del monorepo de origen). Puede ser cualquier subdirectorio del
+  repo origen.
 - **hash_commit**: si no se envía: `stash@{0}` del origen → cambios sin
   commitear del origen (commit temporal con `git stash create`, sin tocar el
   repo) → error "no hay información de cambios". Los untracked de un
   `stash -u` también se transportan.
+
+### Origen temporal (git-cherry-origin)
+
+`xtool git-cherry-origin` cambia el origen por defecto de `git-cherry` por un
+tiempo limitado, sin tocar `GIT_CHERRY_ORIGEN`:
+
+```bash
+xtool git-cherry-origin /ruta/.../Web/symfony_colombia        # activa 30 min
+xtool git-cherry-origin /ruta/.../Web/symfony_mexico --min 60 # otra duración
+xtool git-cherry-origin                                       # estado y minutos restantes
+xtool git-cherry-origin --reset                               # cancela ya
+```
+
+- El vencimiento es **perezoso**: no hay proceso de fondo; al expirar,
+  `git-cherry` vuelve solo al valor de `GIT_CHERRY_ORIGEN` (aunque la máquina
+  se haya reiniciado entremedias). Mientras está vigente, `git-cherry` avisa
+  en cada corrida cuánto falta.
+- El override es **global**: afecta a `git-cherry` desde cualquier directorio.
+  Prioridad: ruta como argumento > override temporal > `GIT_CHERRY_ORIGEN`.
 
 ### Modo acotado (origen = subdirectorio)
 

@@ -7,10 +7,11 @@ Uso:
 El repo destino es el del directorio actual (desde donde se ejecuta el comando).
 
 Argumentos opcionales:
-  - ruta_repo_origen: si no se envía, se toma de la variable de entorno
-    GIT_CHERRY_ORIGEN (también puede vivir en un .env). Puede ser cualquier
-    ruta DENTRO del repo origen (subdirectorio, worktree): se resuelve a la
-    raíz del repo.
+  - ruta_repo_origen: si no se envía, se toma del origen por defecto, con esta
+    prioridad: override temporal de 'xtool git-cherry-origin' (vigente) >
+    variable de entorno GIT_CHERRY_ORIGEN (también puede vivir en un .env).
+    Puede ser cualquier ruta DENTRO del repo origen (subdirectorio,
+    worktree): se resuelve a la raíz del repo.
   - hash_commit: si no se envía, se toma del origen en este orden:
       1. stash@{0} del repo origen (si hay stash). Los untracked guardados
          con 'git stash -u' también se transportan (viven en el 3er padre).
@@ -60,6 +61,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from xtool.common.git_cherry_state import leer_override, minutos_restantes
 from xtool.env_local import load_env
 
 load_env()
@@ -420,6 +422,19 @@ def main(argv=None):
     return 1
 
   env_origen = os.environ.get(ENV_ORIGEN, "").strip() or None
+
+  # Override temporal (xtool git-cherry-origin): vigente gana a la env (un
+  # argumento explícito sigue ganando a ambos). Si expiró, leer_override ya
+  # borró el archivo: se avisa una vez y se vuelve al valor de la env/.env.
+  override, override_expirado = leer_override()
+  if override:
+    env_origen = override["origen"]
+    print(f"==> Origen temporal activo (faltan {minutos_restantes(override)} min): {override['origen']}")
+  elif override_expirado:
+    print(
+      f"==> Override de origen expirado ({override_expirado['minutos']} min); "
+      f"volviendo a {ENV_ORIGEN}: {override_expirado.get('original') or '(ninguno)'}"
+    )
 
   # Parseo flexible: [origen] [commit]. Un único argumento se interpreta como
   # commit si no es un directorio existente (y hay origen por env), o como
