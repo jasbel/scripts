@@ -51,6 +51,23 @@ xtool emails extract        # extrae datos del HTML de referencia a data.json
 Configuración del proyecto (rutas de templates, SMTP para envíos de prueba)
 en `xtool/emails/.env` — ver `xtool/emails/.env.example`.
 
+## git-diff
+
+`xtool git-diff` genera un mensaje de commit Conventional Commits en español
+(voz pasiva, con bullets y alcance) a partir del diff staged, usando IA
+(zai-sdk, modelo `glm-5.3-flash`).
+
+```bash
+git add ...            # staging de los cambios a commitear
+xtool git-diff         # analiza el diff y genera el mensaje
+```
+
+- Requiere `TOKEN_AI` en el `.env` del proyecto o en el del arsenal.
+- El commit ganador se copia al portapapeles (listo para `git commit`).
+- El diff se limita a 1M de caracteres: se excluyen lockfiles, binarios y
+  generados y, si aún supera el límite, se trunca por archivo dejando un
+  resumen (`--compact-summary`) de lo omitido.
+
 ## git-cherry
 
 `xtool git-cherry [ruta_repo_origen] [hash_commit]` transporta un commit de otro
@@ -68,6 +85,11 @@ Ambos argumentos son opcionales:
   commitear del origen (commit temporal con `git stash create`, sin tocar el
   repo) → error "no hay información de cambios". Los untracked de un
   `stash -u` también se transportan.
+
+El repo destino debe estar limpio (`git status` limpio, untracked incluido;
+el chequeo es sobre toda la raíz del repo destino). Si está sucio, el error
+lista las entradas exactas que ve git; con `-f`/`--force` se continúa de
+todos modos.
 
 ### Origen temporal (git-cherry-origin)
 

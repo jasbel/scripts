@@ -23,6 +23,13 @@ Argumentos opcionales:
 
 Los cambios quedan en staging sin commitear, para revisar con 'git diff --cached'.
 
+El repo destino debe estar limpio ('git status' sin cambios NI untracked;
+  el chequeo es sobre toda la raíz del repo destino, no solo el
+  subdirectorio actual). Si está sucio, el error lista exactamente lo que
+  git reporta (los untracked también cuentan: restos '.desde_origen' de
+  corridas previas, artefactos de build, etc.). Con -f/--force se
+  continúa aun con el destino sucio (bajo tu propio riesgo).
+
 Modo acotado (default cuando la ruta origen es un SUBDIRECTORIO del repo
 origen, p.ej. .../Web/symfony_home):
   - Solo se transportan los cambios bajo ese subdirectorio.
@@ -417,8 +424,13 @@ def main(argv=None):
   if argv and argv[0] in ("-h", "--help"):
     print(__doc__)
     return 0
+
+  # -f/--force: saltarse el chequeo de destino limpio (vale en cualquier posición)
+  force = any(a in ("-f", "--force") for a in argv)
+  argv = [a for a in argv if a not in ("-f", "--force")]
+
   if len(argv) > 2:
-    print(f"Uso: xtool git-cherry [ruta_repo_origen] [hash_commit]")
+    print("Uso: xtool git-cherry [-f|--force] [ruta_repo_origen] [hash_commit]")
     return 1
 
   env_origen = os.environ.get(ENV_ORIGEN, "").strip() or None
@@ -467,9 +479,24 @@ def main(argv=None):
   remote_tmp = "tmp_cherry_cross_xtool"
 
   # --- Validaciones ---
-  if out("git", "status", "--porcelain", cwd=repo_root).strip():
-    print("ERROR: el repo destino tiene cambios sin commitear. Haz stash o commit primero.")
-    return 1
+  sucio = out("git", "status", "--porcelain", cwd=repo_root).strip()
+  if sucio:
+    entradas = [l for l in sucio.splitlines() if l.strip()]
+    if force:
+      print(f"AVISO: --force activo; se continúa con el destino sucio ({len(entradas)} entrada(s) en git status).")
+    else:
+      print("ERROR: el repo destino tiene cambios sin commitear. Haz stash o commit primero.")
+      print(f"  'git status --porcelain' (raíz del repo: {repo_root}) reporta {len(entradas)} entrada(s):")
+      for e in entradas[:15]:
+        print(f"    {e}")
+      if len(entradas) > 15:
+        print(f"    (... y {len(entradas) - 15} más)")
+      if all(e.startswith("??") for e in entradas):
+        print("  Son TODAS archivos untracked (??): no hay modificaciones tracked.")
+        if any(".desde_origen" in e for e in entradas):
+          print("  Incluye restos '.desde_origen' de corridas previas de git-cherry.")
+        print("  Si no interfieren con lo que vas a transportar: xtool git-cherry --force")
+      return 1
   # La ruta origen puede ser un subdirectorio: se resuelve a la raíz de su repo
   origen_repo_str = out("git", "rev-parse", "--show-toplevel", cwd=origen).strip()
   if not origen_repo_str:

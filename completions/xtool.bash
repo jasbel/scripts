@@ -40,8 +40,12 @@ _xtool() {
       fi
       ;;
     git-cherry)
-      # Acepta ruta de repo local o hash de commit
-      COMPREPLY=( $(compgen -d -S/ -- "$cur") )
+      if [[ "$cur" == -* ]]; then
+        COMPREPLY=( $(compgen -W "-f --force -h --help" -- "$cur") )
+      else
+        # Acepta ruta de repo local o hash de commit
+        COMPREPLY=( $(compgen -d -S/ -- "$cur") )
+      fi
       ;;
     git-diff|kill-port)
       # Sin opciones: no proponer nada
