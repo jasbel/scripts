@@ -20,9 +20,11 @@ El commit ganador se copia al portapapeles.
 
 import os
 import platform
+import queue
 import re
 import shutil
 import subprocess
+import threading
 import time
 from typing import Any, Dict, List, Optional, cast
 
@@ -46,13 +48,9 @@ class ChatCompletionChunk:
 client = ZaiClient(api_key=os.getenv("TOKEN_AI"), base_url="https://api.z.ai/api/coding/paas/v4/")
 
 MODELS = [
-  # "glm-4.5-air",
+  # Carrera en paralelo: se lanzan todos y gana el primero con respuesta válida
+  "glm-5-turbo",
   "glm-5.3-flash",
-  # "glm-4.5-flash",
-  # "glm-5.2",
-  # "glm-5.1",
-  # "glm-4.6",
-  # "glm-5-turbo",
 ]
 
 PRICING_USD_PER_1M = {
@@ -671,6 +669,27 @@ def analizer_changes(diff, model):
       "error": msg,
     }
 
+def carrera_modelos(diff):
+  """Lanza todos los MODELS en paralelo y devuelve el primer resultado con salida válida."""
+  if len(MODELS) == 1:
+    return analizer_changes(diff, MODELS[0])
+  cola = queue.Queue()
+
+  def _worker(model):
+    cola.put(analizer_changes(diff, model))
+
+  hilos = [threading.Thread(target=_worker, args=(m,), daemon=True) for m in MODELS]
+  for h in hilos:
+    h.start()
+  ganador = None
+  for _ in range(len(MODELS)):
+    r = cola.get()
+    if r.get("output", "").strip():
+      ganador = r
+      break
+  return ganador
+
+
 def main(argv=None):
   start_time = time.perf_counter()
 
@@ -686,7 +705,7 @@ def main(argv=None):
     return
 
   n_files = meta["raw_files"]
-  resumen = f"Diff: {n_files} {'archivo' if n_files == 1 else 'archivos'} · {_fmt_size(len(diff))}"
+  resumen = f"Diff: {n_files} {'archivo' if n_files == 1 else 'archivos'} · {_fmt_size(len(diff))} · {_fmt_thousands(len(diff))} caracteres"
   if meta["excluded_files"]:
     resumen += f" · {len(meta['excluded_files'])} excluidos"
   if meta["truncated_files"]:
@@ -699,12 +718,8 @@ def main(argv=None):
   if issue_id:
     print(f"Rama con ID detectado: [{issue_id}] se antepondrá al commit")
 
-  results = []
-  for model in MODELS:
-    result = analizer_changes(diff, model)
-    results.append(result)
-
-
+  ganador = carrera_modelos(diff)
+  results = [ganador] if ganador else []
 
   # print("\n\n========== RESUMEN COMPARATIVO ==========")
 
