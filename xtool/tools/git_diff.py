@@ -12,6 +12,9 @@ El diff se limita a 1M de caracteres: se excluyen lockfiles, binarios y
 generados y, si aun así supera el límite, se trunca por archivo dejando un
 resumen de lo omitido.
 
+Si la rama actual lleva un ID numérico (feat-123, issue/45, hotfix-789, ...)
+se antepone [123] al commit generado.
+
 El commit ganador se copia al portapapeles.
 """
 
@@ -139,6 +142,9 @@ ORIGINAL_EXCLUDES = [
   ":(exclude)test.py",
   ":(exclude)*/test.py",
 ]
+
+# Rama con ID numérico: feat-123, issue/45, hotfix-789, dev-101, feature_1012, ...
+BRANCH_ID_RE = re.compile(r"^(?:feat|feature|issue|fix|bug|hotfix|task|story|dev)[/_-](\d+)")
 
 BASE_EXCLUDE_PATTERNS = [
   r"\.lock$",
@@ -542,6 +548,36 @@ def parse_response(respuesta):
   return commit, summary
 
 
+def get_issue_id():
+  """Devuelve el ID numérico de la rama actual (feat-123, issue/45, ...) o None."""
+  try:
+    proc = subprocess.run(
+      ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+      capture_output=True,
+      text=True,
+      encoding="utf-8",
+      errors="replace",
+      timeout=10,
+    )
+  except Exception:
+    return None
+  if proc.returncode != 0:
+    return None
+  branch = proc.stdout.strip()
+  match = BRANCH_ID_RE.match(branch)
+  return match.group(1) if match else None
+
+
+def add_issue_prefix(commit, issue_id):
+  """Antepone [ID] al commit si la rama lleva un ID numérico y aún no está."""
+  if not issue_id:
+    return commit
+  tag = f"[{issue_id}]"
+  if tag in commit:
+    return commit
+  return f"{tag} {commit}"
+
+
 def score_quality(output):
   checks = []
   text = output.strip()
@@ -600,10 +636,7 @@ def analizer_changes(diff, model):
       if chunk.choices and chunk.choices[0].delta.content:
         if t_first_token is None:
           t_first_token = time.perf_counter()
-          print(f"   -> Primer token: {(t_first_token - t_start):.2f}s \n")
-          print(f"=============================================\n")
         content = chunk.choices[0].delta.content
-        print(content, end="", flush=True)
         respuesta += content
       if chunk.usage:
         prompt_tokens = chunk.usage.prompt_tokens or 0
@@ -613,9 +646,6 @@ def analizer_changes(diff, model):
           reasoning_tokens = getattr(details, "reasoning_tokens", 0) or 0
 
     total_ms = (time.perf_counter() - t_start) * 1000
-    print(f"\n=============================================")
-    print(f"\n   -> Stream completo: {(total_ms / 1000):.2f}s")
-    print(f"   -> Tokens: prompt={prompt_tokens}, completion={completion_tokens}, reasoning={reasoning_tokens}")
 
     return {
       "model": model,
@@ -629,7 +659,7 @@ def analizer_changes(diff, model):
   except Exception as e:
     total_ms = (time.perf_counter() - t_start) * 1000
     msg = str(e)
-    print(f"   -> Error: {msg}")
+    print(f"Error ({model}): {msg}")
     return {
       "model": model,
       "first_token_ms": None,
@@ -644,9 +674,7 @@ def analizer_changes(diff, model):
 def main(argv=None):
   start_time = time.perf_counter()
 
-  t_diff = time.perf_counter()
   diff, meta = get_git_diff()
-  print(f"Tiempo obtención git diff: {(time.perf_counter() - t_diff):.4f}s")
 
   if diff is None:
     if meta["error"]:
@@ -657,27 +685,22 @@ def main(argv=None):
       print("No hay cambios pendientes en git")
     return
 
-  print("\n========== CAPTURA DEL DIFF ==========")
-  print(f"Comando: {meta['command']}")
-  print(f"Archivos en diff: {meta['raw_files']} · original: {_fmt_thousands(meta['original_chars'])} chars ({_fmt_size(meta['original_chars'])})")
+  n_files = meta["raw_files"]
+  resumen = f"Diff: {n_files} {'archivo' if n_files == 1 else 'archivos'} · {_fmt_size(len(diff))}"
+  if meta["excluded_files"]:
+    resumen += f" · {len(meta['excluded_files'])} excluidos"
+  if meta["truncated_files"]:
+    resumen += f" · {len(meta['truncated_files'])} truncados"
+  if meta["omitted_files"]:
+    resumen += f" · {len(meta['omitted_files'])} omitidos"
+  print(resumen)
 
-  for i, st in enumerate(meta["stages"], 1):
-    print(f"\n[{i}] {st['label']}")
-    print(f"    {_fmt_thousands(st['before'])} → {_fmt_thousands(st['after'])} chars · archivos: {st['files_before']} → {st['files_after']}")
-    for p, ch in st["dropped"][:15]:
-      print(f"    - {p} ({_fmt_size(ch)})")
-    if len(st["dropped"]) > 15:
-      print(f"    - ... y {len(st['dropped']) - 15} archivos más")
-    for t in st["truncated"]:
-      pct = (t["kept"] / t["total"] * 100) if t["total"] else 0
-      print(f"    ~ {t['path']}: {_fmt_size(t['kept'])} de {_fmt_size(t['total'])} ({pct:.0f}% · {_fmt_thousands(t['omitted'])} chars omitidos)")
-
-  pct_final = len(diff) / MAX_DIFF_CHARS * 100
-  print(f"\nFINAL: {_fmt_thousands(len(diff))} / {_fmt_thousands(MAX_DIFF_CHARS)} chars ({_fmt_size(len(diff))} · {pct_final:.1f}% del presupuesto · cola: {_fmt_thousands(meta['tail_chars'])} chars)\n")
+  issue_id = get_issue_id()
+  if issue_id:
+    print(f"Rama con ID detectado: [{issue_id}] se antepondrá al commit")
 
   results = []
   for model in MODELS:
-    print(f"\n=== Probando modelo: {model} ===")
     result = analizer_changes(diff, model)
     results.append(result)
 
@@ -729,32 +752,17 @@ def main(argv=None):
 
 
 
-  print("\n--- Detalle de calidad por modelo ---")
-  for s in scored:
-    failed = [c["name"] for c in s["checks"] if not c["pass"]]
-    estado = f" (falla: {', '.join(failed)})" if failed else " (perfecto)"
-    print(f"{s['model']}: {s['quality'] * 100:.0f}%{estado}")
-
   if not scored:
-    pass
-  elif len(results) == 1:
+    print("Error: ningún modelo generó commit")
+  else:
     best = scored[0]
-    # print(f"\nScore combinado: {best['combined'] * 100:.0f}/100")
     commit, summary = parse_response(best["output"])
+    commit = add_issue_prefix(commit, issue_id)
+    print(f"\n{commit}\n")
     copy_to_clipboard(commit)
-    # if summary:
-    #   print(f"\n{summary}\n")
-  elif len(results) > 1:
-    best = scored[0]
-    # print(f"\nGanador global: {best['model']} (score {best['combined']:.2f})")
-    # print("Pesos: tiempo 25% · costo 25% · calidad 50%")
-    commit, summary = parse_response(best["output"])
-    copy_to_clipboard(commit)
-    # if summary:
-    #   print(f"\n{summary}\n")
 
   elapsed = time.perf_counter() - start_time
-  print(f"\nTIEMPO TOTAL SCRIPT: {elapsed:.2f}s")
+  print(f"Total: {elapsed:.2f}s")
 
 
 if __name__ == "__main__":

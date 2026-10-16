@@ -64,6 +64,8 @@ xtool git-diff         # analiza el diff y genera el mensaje
 
 - Requiere `TOKEN_AI` en el `.env` del proyecto o en el del arsenal.
 - El commit ganador se copia al portapapeles (listo para `git commit`).
+- Si la rama actual lleva un ID numérico (`feat-123`, `issue/45`,
+  `hotfix-789`, ...), se antepone `[123]` al commit generado.
 - El diff se limita a 1M de caracteres: se excluyen lockfiles, binarios y
   generados y, si aún supera el límite, se trunca por archivo dejando un
   resumen (`--compact-summary`) de lo omitido.
