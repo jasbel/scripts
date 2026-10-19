@@ -37,14 +37,33 @@ Opciones:
   -f/--force    continúa aunque el destino esté sucio (bajo tu propio riesgo).
   --no-push     aplica y commitea, pero no pushea.
 
+scss / css compilado:
+  - Si algún archivo transportado de un app es *.scss, se ejecuta
+    'npm run css' en el subdirectorio del DESTINO antes de commitear; el
+    css generado se incluye en el MISMO commit [pre] (los css compilados
+    están trackeados en estos repos).
+  - Si el app no tiene package.json o no define el script 'css': aviso y
+    se commitea sin compilar.
+  - Si 'npm run css' falla: ese destino queda PENDIENTE (sin commit ni
+    push); arregla el build, commitea con el mensaje sugerido y pushea.
+
+Conflictos de css compilado:
+  - Los conflictos o '.desde_origen' en assets/css/base/*.css se
+    auto-resuelven con la versión del ORIGEN (incoming): son artefactos
+    compilados, no código a conciliar. Si tras resolverlos no queda ningún
+    otro conflicto, el destino se commitea y pushea normal; si quedan
+    conflictos en otros archivos, ese destino queda PENDIENTE (con los css
+    ya resueltos y staged).
+
 Configuración en ~/.config/xtool/git-deploy.json (o la ruta de la variable
 de entorno GIT_DEPLOY_CONFIG):
 
   {
     "mapeos": [
       {
-        "origen": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_home",
-        "destino": "~/projects/symfony-sites/sites/sc_clone/DDD/1_Presentation/Web/symfony_home",
+        "origen": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web",
+        "destino": "~/projects/symfony-sites/sites/sc_clone/DDD/1_Presentation/Web",
+        "patron": "symfony_*",
         "rama": "home-symfony",
         "remote": "origin"
       }
@@ -53,6 +72,12 @@ de entorno GIT_DEPLOY_CONFIG):
 
 - origen/destino: subdirectorios (con ~ si quieres); el repo destino se
   resuelve desde 'destino'.
+- patron: (opcional) expande el mapeo a los subdirectorios de PRIMER nivel
+  de 'origen' cuyo nombre matchee el glob: un solo mapeo Web -> Web con
+  "symfony_*" cubre todos los apps symfony_* actuales y futuros (cada app
+  se despliega por separado, con su propio commit [pre], solo si el commit
+  lo toca). Un mapeo explícito (sin patron) con el mismo 'origen' que uno
+  expandido gana sobre él.
 - rama: rama esperada en el destino (solo validación con aviso).
 - remote: remote al que pushear (default "origin"); se pushea la rama
   ACTIVA del destino (donde cayó el commit).
@@ -64,8 +89,11 @@ resolver a mano, y se continúa con los demás destinos. Código de salida:
 pendiente.
 """
 
+import fnmatch
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -74,6 +102,7 @@ from xtool.common.git_transport import (
   EMPTY_TREE,
   aplicar_acotado,
   conflicted_files,
+  escribir_blob,
   out,
   run,
   subdir_relativo,
@@ -83,11 +112,16 @@ ENV_CONFIG = "GIT_DEPLOY_CONFIG"
 CONFIG_DEFAULT = Path.home() / ".config" / "xtool" / "git-deploy.json"
 PREFIJO = "[pre]"
 
+# Css compilado (artefacto): en conflictos, la versión del origen manda
+CSS_BASE = "assets/css/base/"
+SUFIJO_DESDE_ORIGEN = ".desde_origen"
+
 EJEMPLO = """{
   "mapeos": [
     {
-      "origen": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_home",
-      "destino": "~/projects/symfony-sites/sites/sc_clone/DDD/1_Presentation/Web/symfony_home",
+      "origen": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web",
+      "destino": "~/projects/symfony-sites/sites/sc_clone/DDD/1_Presentation/Web",
+      "patron": "symfony_*",
       "rama": "home-symfony",
       "remote": "origin"
     }
@@ -125,10 +159,34 @@ def cargar_mapeos():
     mapeos.append({
       "origen": Path(str(m["origen"]).strip()).expanduser().resolve(),
       "destino": Path(str(m["destino"]).strip()).expanduser().resolve(),
+      "patron": str(m.get("patron") or "").strip() or None,
       "rama": str(m.get("rama") or "").strip() or None,
       "remote": str(m.get("remote") or "origin").strip() or "origin",
     })
   return mapeos
+
+
+def expandir_mapeo(m, origen_repo: Path):
+  """Expande un mapeo en candidatos concretos por subdirectorio.
+
+  Sin 'patron': un único candidato (el mapeo tal cual).
+  Con 'patron' (glob): un candidato por subdirectorio de primer nivel de
+  'origen' cuyo nombre matchee: origen/<sub> -> destino/<sub>.
+  """
+  if not m["patron"]:
+    return [{**m, "origen_sub": subdir_relativo(m["origen"], origen_repo)}]
+  virtuales = []
+  for sub in sorted(m["origen"].iterdir()):
+    if sub.is_dir() and fnmatch.fnmatch(sub.name, m["patron"]):
+      virtuales.append({
+        **m,
+        "origen": sub,
+        "destino": m["destino"] / sub.name,
+        "origen_sub": subdir_relativo(sub, origen_repo),
+      })
+  if not virtuales:
+    print(f"AVISO: el patrón '{m['patron']}' no matchea ningún subdirectorio de {mostrar_ruta(m['origen'])}")
+  return virtuales
 
 
 def resolver_commits(origen_repo: Path, spec: str):
@@ -235,20 +293,92 @@ def validar_destino(candidato, force):
   return plan, errores, avisos
 
 
+def compilar_css(plan):
+  """Ejecuta 'npm run css' en el subdirectorio del destino y stagea el css generado.
+
+  Devuelve ('ok', None), ('sin-build', motivo) si no hay nada que ejecutar
+  (se commitea sin compilar, con aviso) o ('fallo', None) si el build falló.
+  """
+  app = plan["destino"]
+  pkg = app / "package.json"
+  if not pkg.is_file():
+    return "sin-build", f"no hay package.json en {mostrar_ruta(app)}"
+  try:
+    scripts = json.loads(pkg.read_text(encoding="utf-8")).get("scripts", {})
+  except (json.JSONDecodeError, OSError) as e:
+    return "sin-build", f"package.json ilegible en {mostrar_ruta(app)}: {e}"
+  if "css" not in scripts:
+    return "sin-build", f"el package.json de {mostrar_ruta(app)} no define el script 'css'"
+  if not shutil.which("npm"):
+    return "sin-build", "npm no está en el PATH"
+
+  print(f"==> scss transportados: compilando css en {mostrar_ruta(app)} (npm run css)...")
+  resultado = subprocess.run(("npm", "run", "css"), cwd=app, text=True, capture_output=True)
+  if resultado.returncode != 0:
+    salida = (resultado.stderr.strip() or resultado.stdout.strip()).splitlines()
+    print("ERROR: falló npm run css:")
+    for linea in salida[-20:]:
+      print(f"    {linea}")
+    return "fallo", None
+
+  # El css generado (trackeado) entra en el mismo commit [pre]
+  sub = plan["destino_sub"] or "."
+  run("git", "add", "-A", "--", sub, cwd=plan["destino_repo"])
+  print("==> css compilado y agregado al staging")
+  return "ok", None
+
+
+def resolver_conflictos_css(plan, origen_repo: Path, commit_final: str):
+  """Auto-resuelve conflictos/atenciones de css compilado con la versión del origen.
+
+  Para archivos assets/css/base/*.css (artefactos compilados) el 'incoming'
+  manda: se escribe la versión del repo origen en el commit final y se stagea.
+  Devuelve la lista de rutas destino resueltas.
+  """
+  repo = plan["destino_repo"]
+  destino_sub = plan["destino_sub"]
+  origen_sub = plan["origen_sub"]
+
+  def a_origen(path: str) -> str:
+    rel = path[len(destino_sub) + 1:] if destino_sub else path
+    return (origen_sub + "/" + rel) if origen_sub else rel
+
+  def resolver(destino: str):
+    origen_path = a_origen(destino)
+    if run("git", "cat-file", "-e", f"{commit_final}:{origen_path}", cwd=origen_repo, check=False).returncode != 0:
+      print(f"AVISO: no se pudo auto-resolver {destino} (no existe en {commit_final[:8]}).")
+      return False
+    escribir_blob(origen_repo, repo, commit_final, origen_path, destino)
+    print(f"==> Auto-resuelto (css compilado, versión del origen): {destino}")
+    return True
+
+  resueltos = []
+  for status, path in conflicted_files(repo):
+    if "U" in status and path.endswith(".css") and CSS_BASE in path:
+      if resolver(path):
+        resueltos.append(path)
+  for status, path in conflicted_files(repo):
+    if path.endswith(SUFIJO_DESDE_ORIGEN):
+      destino = path[: -len(SUFIJO_DESDE_ORIGEN)]
+      if destino.endswith(".css") and CSS_BASE in destino and resolver(destino):
+        (repo / path).unlink(missing_ok=True)
+        resueltos.append(destino)
+  return resueltos
+
+
 def desplegar(plan, commits, origen_repo, patch_file, msg_file, autor, no_push):
   """Aplica los commits en el destino, commitea y pushea. Devuelve el estado."""
   nombre = plan["origen_sub"] or "(raíz)"
   print(f"\n==> Desplegando {nombre} -> {mostrar_ruta(plan['destino'])}")
 
-  pendiente = False
   for sha in commits:
-    resumen = aplicar_acotado(plan["destino_repo"], origen_repo, sha, plan["origen_sub"], plan["destino_sub"], patch_file)
-    if resumen["conflictos"] or resumen["atenciones"]:
-      pendiente = True
+    aplicar_acotado(plan["destino_repo"], origen_repo, sha, plan["origen_sub"], plan["destino_sub"], patch_file)
 
-  unmerged = [p for s, p in conflicted_files(plan["destino_repo"]) if "U" in s]
-  if not pendiente and unmerged:
-    pendiente = True
+  # Css compilado en conflicto: la versión del origen (incoming) es autoritativa
+  resolver_conflictos_css(plan, origen_repo, commits[-1])
+
+  entradas = conflicted_files(plan["destino_repo"])
+  pendiente = any("U" in s or p.endswith(SUFIJO_DESDE_ORIGEN) for s, p in entradas)
 
   if pendiente:
     print("==> PENDIENTE: este destino quedó con conflictos/atenciones; NO se commitea ni pushea.")
@@ -261,6 +391,22 @@ def desplegar(plan, commits, origen_repo, patch_file, msg_file, autor, no_push):
     for linea in msg_file.read_text(encoding="utf-8").splitlines():
       print(f"      | {linea}")
     return "pendiente"
+
+  if plan.get("scss"):
+    estado_css, detalle = compilar_css(plan)
+    if estado_css == "sin-build":
+      print(f"AVISO: no se compiló el css ({detalle}); se commitea sin él.")
+    elif estado_css == "fallo":
+      print("==> PENDIENTE: falló npm run css; NO se commitea ni pushea.")
+      print("    Arregla el build, compila, commitea (mensaje sugerido abajo) y pushea:")
+      print(f"      cd {plan['destino']}")
+      print("      npm run css")
+      print(f"      git -C {plan['destino_repo']} add -A -- {plan['destino_sub'] or '.'}")
+      print(f"      git -C {plan['destino_repo']} push {plan['remote']} {plan['rama_activa']}")
+      print("    Mensaje sugerido:")
+      for linea in msg_file.read_text(encoding="utf-8").splitlines():
+        print(f"      | {linea}")
+      return "pendiente"
 
   commit = run("git", "commit", "-F", str(msg_file), f"--author={autor}", cwd=plan["destino_repo"], check=False)
   if commit.returncode != 0:
@@ -314,8 +460,8 @@ def main(argv=None):
   if mapeos is None:
     return 1
 
-  # --- Mapeos de este repo origen ---
-  candidatos = []
+  # --- Mapeos de este repo origen (los de 'patron' se expanden por app) ---
+  explicitos, por_patron = {}, []
   for m in mapeos:
     if not m["origen"].is_dir():
       print(f"AVISO: se ignora el mapeo con origen inexistente: {mostrar_ruta(m['origen'])}")
@@ -324,8 +470,15 @@ def main(argv=None):
     if not repo_str:
       print(f"AVISO: se ignora el mapeo cuyo origen no está en un repo git: {mostrar_ruta(m['origen'])}")
       continue
-    if Path(repo_str) == origen_repo:
-      candidatos.append({**m, "origen_sub": subdir_relativo(m["origen"], origen_repo)})
+    if Path(repo_str) != origen_repo:
+      continue
+    for c in expandir_mapeo(m, origen_repo):
+      if m["patron"]:
+        por_patron.append(c)
+      else:
+        explicitos[str(c["origen"])] = c
+  # El mapeo explícito gana al expandido por patrón para el mismo subdirectorio
+  candidatos = list(explicitos.values()) + [c for c in por_patron if str(c["origen"]) not in explicitos]
   if not candidatos:
     print(f"ERROR: no hay mapeos de git-deploy para el repo {mostrar_ruta(origen_repo)}")
     print("Revisa los valores de 'origen' en ~/.config/xtool/git-deploy.json.")
@@ -344,9 +497,13 @@ def main(argv=None):
   afectados = []
   for c in candidatos:
     prefijo = (c["origen_sub"] + "/") if c["origen_sub"] else ""
-    n = len(todos_archivos) if not prefijo else sum(1 for a in todos_archivos if a.startswith(prefijo))
-    if n:
-      afectados.append({**c, "archivos": n})
+    archivos_sub = list(todos_archivos) if not prefijo else [a for a in todos_archivos if a.startswith(prefijo)]
+    if archivos_sub:
+      afectados.append({
+        **c,
+        "archivos": len(archivos_sub),
+        "scss": any(a.endswith(".scss") for a in archivos_sub),
+      })
   if not afectados:
     print(f"ERROR: el commit no toca ningún subdirectorio mapeado de {mostrar_ruta(origen_repo)}:")
     for c in candidatos:
@@ -380,7 +537,7 @@ def main(argv=None):
     rama = plan["rama_activa"] + (f" (esperada: {plan['rama']})" if plan["rama"] else "")
     print(f"  [{i}] {plan['origen_sub'] or '(raíz)'} -> {mostrar_ruta(plan['destino'])}")
     print(f"        repo destino: {mostrar_ruta(plan['destino_repo'])} | rama: {rama} | remote: {plan['remote']}")
-    print(f"        {plan['archivos']} archivo(s) afectado(s)")
+    print(f"        {plan['archivos']} archivo(s) afectado(s)" + (" | incluye .scss -> npm run css" if plan.get("scss") else ""))
     for sha in commits:
       print(f"        {sha[:8]} {metadatos(origen_repo, sha, '%s')}")
     for a in avisos:
@@ -432,7 +589,7 @@ def main(argv=None):
     if estado == "ok":
       print(f"  OK        {nombre} -> {mostrar_ruta(plan['destino'])} ({plan['rama_activa']})")
     elif estado == "pendiente":
-      print(f"  PENDIENTE {nombre} -> {mostrar_ruta(plan['destino'])} (conflictos a resolver a mano, sin commit/push)")
+      print(f"  PENDIENTE {nombre} -> {mostrar_ruta(plan['destino'])} (revisar: conflictos o build de css; sin commit/push)")
       fallos += 1
     elif estado == "push_error":
       print(f"  SIN PUSH  {nombre} -> {mostrar_ruta(plan['destino'])} (commit creado, push fallido)")

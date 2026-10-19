@@ -172,15 +172,32 @@ xtool git-deploy --no-push    # aplica y commitea, sin pushear
   commitear ni pushear (cambios en staging para resolver a mano) y se continúa
   con los demás. Sale con código 1 si algo falló o quedó pendiente.
 
-Configuración en `~/.config/xtool/git-deploy.json` (o la ruta de la variable
-`GIT_DEPLOY_CONFIG`):
+### scss → css compilado
+
+Si algún archivo transportado de un app es `*.scss`, se ejecuta `npm run css`
+en el subdirectorio del **destino** antes de commitear y el css generado entra
+en el **mismo commit `[pre]`** (los css compilados están trackeados en estos
+repos). Si el app no tiene `package.json` o no define el script `css`: aviso y
+se commitea sin compilar. Si `npm run css` falla: ese destino queda PENDIENTE
+(sin commit/push).
+
+Los conflictos o `.desde_origen` en `assets/css/base/*.css` se **auto-resuelven
+con la versión del origen** (incoming): son artefactos compilados, no código a
+conciliar. Si tras resolverlos no queda ningún otro conflicto, el destino se
+commitea y pushea normal; si quedan conflictos en otros archivos, el destino
+queda PENDIENTE con los css ya resueltos en staging.
+
+### Configuración
+
+`~/.config/xtool/git-deploy.json` (o la ruta de la variable `GIT_DEPLOY_CONFIG`):
 
 ```json
 {
   "mapeos": [
     {
-      "origen": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_home",
-      "destino": "~/projects/symfony-sites/sites/sc_clone/DDD/1_Presentation/Web/symfony_home",
+      "origen": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web",
+      "destino": "~/projects/symfony-sites/sites/sc_clone/DDD/1_Presentation/Web",
+      "patron": "symfony_*",
       "rama": "home-symfony",
       "remote": "origin"
     }
@@ -191,6 +208,11 @@ Configuración en `~/.config/xtool/git-deploy.json` (o la ruta de la variable
 - `origen`/`destino`: subdirectorios (admiten `~`); `rama` es la esperada en el
   destino (solo validación con aviso) y `remote` el destino del push (default
   `origin`).
+- `patron`: expande el mapeo a los subdirectorios de primer nivel de `origen`
+  cuyo nombre matchee el glob — un solo mapeo `Web -> Web` con `symfony_*`
+  cubre todos los apps `symfony_*` actuales y futuros, y cada app se despliega
+  por separado (su propio commit `[pre]`) solo si el commit lo toca. Un mapeo
+  explícito (sin `patron`) con el mismo `origen` gana sobre el patrón.
 - La lógica de transporte (modo acotado archivo por archivo con `git apply -3`)
   vive en `xtool/common/git_transport.py`, compartida con `git-cherry`.
 
