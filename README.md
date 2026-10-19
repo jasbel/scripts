@@ -139,6 +139,61 @@ cherry-pick `-n -Xno-renames` (sin renombres: nada se reubica por similitud) y
 resuelve los conflictos modify/delete cross-repo mapeando la ruta al sufijo que
 exista en el destino.
 
+## git-deploy
+
+`xtool git-deploy [commit_o_rango]` despliega commits del repo actual a los
+clones de preproducción (sc_clone / sc_clone_2): cherry-pick acotado al
+subdirectorio, commit con prefijo `[pre] ` y push. Es el flujo "ir a sc_clone,
+buscar el commit, cherry-pick, push" reducido a un solo comando ejecutado
+desde donde trabajaste.
+
+```bash
+cd ~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_home
+git add ... && git commit -m "..."
+xtool git-deploy              # HEAD -> sc_clone, commitea "[pre] ..." y pushea
+xtool git-deploy abc1234      # un commit específico
+xtool git-deploy HEAD~2..HEAD # rango: se aplasta (squash) en UN commit por destino
+xtool git-deploy -y           # sin pedir confirmación con Enter
+xtool git-deploy --no-push    # aplica y commitea, sin pushear
+```
+
+- Un commit que toca varios subdirectorios mapeados (p.ej. `symfony_home` y
+  `symfony_lujo`) se despliega a **todos** sus destinos en secuencia; los
+  archivos fuera de los mapeos se ignoran (se informa el total).
+- Resumen + Enter antes de actuar (Ctrl+C cancela). Validaciones: destino
+  limpio (si está sucio se excluye, salvo `-f`/`--force`); la rama activa se
+  compara con la esperada del mapeo y **solo avisa** si difiere.
+- El push es `git push <remote del mapeo> <rama activa del destino>`; no hace
+  falta pushear el origen antes: los blobs se leen del repo local.
+- Mensaje: `[pre] <subject original>` (con `Origen: <sha>` en el cuerpo y el
+  autor original). Los rangos generan un solo commit
+  `[pre] <subject más nuevo> (N commits)` con la lista completa.
+- Si un destino conflictúa (merge conflicts o `.desde_origen`), queda SIN
+  commitear ni pushear (cambios en staging para resolver a mano) y se continúa
+  con los demás. Sale con código 1 si algo falló o quedó pendiente.
+
+Configuración en `~/.config/xtool/git-deploy.json` (o la ruta de la variable
+`GIT_DEPLOY_CONFIG`):
+
+```json
+{
+  "mapeos": [
+    {
+      "origen": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_home",
+      "destino": "~/projects/symfony-sites/sites/sc_clone/DDD/1_Presentation/Web/symfony_home",
+      "rama": "home-symfony",
+      "remote": "origin"
+    }
+  ]
+}
+```
+
+- `origen`/`destino`: subdirectorios (admiten `~`); `rama` es la esperada en el
+  destino (solo validación con aviso) y `remote` el destino del push (default
+  `origin`).
+- La lógica de transporte (modo acotado archivo por archivo con `git apply -3`)
+  vive en `xtool/common/git_transport.py`, compartida con `git-cherry`.
+
 ## Autocompletado (bash)
 
 El script `completions/xtool.bash` agrega autocompletado con TAB:

@@ -16,7 +16,7 @@ _xtool() {
   commands="$(xtool 2>/dev/null | awk '/^Comandos disponibles:/{f=1;next} f&&NF{print $1}')"
   if [[ -z "$commands" ]]; then
     # Fallback estático si xtool no responde
-    commands="emails git-cherry git-diff kill-port"
+    commands="emails git-cherry git-deploy git-diff kill-port"
   fi
   commands="$commands help"
 
@@ -45,6 +45,14 @@ _xtool() {
       else
         # Acepta ruta de repo local o hash de commit
         COMPREPLY=( $(compgen -d -S/ -- "$cur") )
+      fi
+      ;;
+    git-deploy)
+      if [[ "$cur" == -* ]]; then
+        COMPREPLY=( $(compgen -W "-y --yes -f --force --no-push -h --help" -- "$cur") )
+      else
+        # Commit o rango: hashes recientes del repo actual + atajos útiles
+        COMPREPLY=( $(compgen -W "HEAD HEAD~1 HEAD~2 HEAD~3 $(git log --format='%h' -10 2>/dev/null)" -- "$cur") )
       fi
       ;;
     git-diff|kill-port)
