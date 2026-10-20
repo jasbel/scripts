@@ -1,0 +1,99 @@
+#compdef xtool
+
+# Autocompletado zsh para xtool.
+# Instalación (oh-my-zsh): symlink en ~/.oh-my-zsh/custom/completions/_xtool
+#   mkdir -p ~/.oh-my-zsh/custom/completions
+#   ln -sf ~/projects/script/scripts/completions/_xtool ~/.oh-my-zsh/custom/completions/_xtool
+#
+# La lista de comandos se genera dinámicamente con `xtool __complete`
+# (los tools nuevos en xtool/tools/ autocompletean solos).
+
+local -a cmds subs hashes
+local -a fallback
+fallback=(
+  'emails:Servidor de preview de emails (xtool/emails)'
+  'git-cherry:Transporta un commit de otro repo local al repo actual'
+  'git-cherry-origin:Cambia temporalmente el origen por defecto de git-cherry'
+  'git-deploy:Despliega commits del repo a los clones de preproducción'
+  'git-diff:Genera un mensaje de commit Conventional Commits con IA'
+  'info:Muestra información del arsenal xtool'
+  'kill-port:Termina el proceso que ocupa un puerto TCP'
+  'update:Actualiza este arsenal (git pull)'
+  'help:Manual de un comando'
+)
+
+cmds=("${(@f)$(xtool __complete 2>/dev/null)}")
+if (( ${#cmds} == 0 )); then
+  cmds=($fallback)
+fi
+
+_arguments \
+  '(-h --help)'{-h,--help}'[muestra los comandos disponibles]' \
+  '1:comando:->cmd' \
+  '*::arg:->args'
+
+case $state in
+  cmd)
+    _describe -t commands 'comando xtool' cmds
+    ;;
+  args)
+    case $words[1] in
+      help)
+        _describe -t commands 'comando' cmds
+        ;;
+      emails)
+        _arguments \
+          '--port[puerto del server (default: 3466)]:puerto:' \
+          '--no-install[no ejecuta npm install aunque falte node_modules]' \
+          '(-h --help)'{-h,--help}'[ayuda]' \
+          '1:subcomando:->sub'
+        if [[ $state == sub ]]; then
+          subs=(
+            'server:servidor de preview con hot-reload (default)'
+            'build:compila MJML -> HTML una sola vez'
+            'watch:compila MJML y recompila al guardar'
+            'extract:extrae datos del HTML de referencia a data.json'
+            'dist:renderiza plantillas odoo con data.json -> dist/'
+          )
+          _describe -t subcommands 'subcomando' subs
+        fi
+        ;;
+      git-cherry)
+        _arguments \
+          '(-f --force)'{-f,--force}'[transporta aunque el destino esté sucio]' \
+          '(-h --help)'{-h,--help}'[ayuda]' \
+          '1:ruta del repo origen:_path_files -/' \
+          '2:commit del origen:->hash'
+        if [[ $state == hash ]]; then
+          # Hashes del repo de origen (primer argumento), no del actual
+          hashes=(${(f)"$(git -C ${~words[2]} log --format='%h:%s' -10 2>/dev/null)"})
+          hashes+=('stash@{0}:stash más reciente del origen')
+          _describe -t hashes 'commit del origen' hashes
+        fi
+        ;;
+      git-cherry-origin)
+        _arguments \
+          '--reset[cancela el override vigente]' \
+          '--min[duración del override en minutos]:minutos:' \
+          '(-h --help)'{-h,--help}'[ayuda]' \
+          '1:ruta del repo origen:_path_files -/'
+        ;;
+      git-deploy)
+        _arguments \
+          '(-y --yes)'{-y,--yes}'[salta la confirmación]' \
+          '(-f --force)'{-f,--force}'[despliega aunque un destino esté sucio]' \
+          '--no-push[commitea pero no pushea]' \
+          '(-h --help)'{-h,--help}'[ayuda]' \
+          '1:commit o rango:->hash'
+        if [[ $state == hash ]]; then
+          hashes=(${(f)"$(git log --format='%h:%s' -10 2>/dev/null)"})
+          hashes+=('HEAD:HEAD actual' 'HEAD~1:commit previo' 'HEAD~2:hace dos commits')
+          _describe -t hashes 'commit o rango' hashes
+        fi
+        ;;
+      *)
+        # info, kill-port, update, git-diff: sin completado de argumentos
+        ;;
+    esac
+    ;;
+esac

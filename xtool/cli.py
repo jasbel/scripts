@@ -49,6 +49,13 @@ def _print_manual(name):
   print(doc if doc else "(sin manual: agrega un docstring al módulo)")
 
 
+def _print_complete():
+  """Emite `comando:descripción` (uno por línea) para autocompletado de shell."""
+  for t in _available_tools():
+    print(f"{_cmd_name(t)}:{_short(t)}")
+  print("help:manual del comando (xtool help <comando>)")
+
+
 def _resolve(name_arg):
   name = name_arg.replace("-", "_")
   if not VALID_NAME.match(name) or not (TOOLS_DIR / f"{name}.py").exists():
@@ -69,6 +76,11 @@ def main(argv=None):
         return 0
       return 1
     _print_usage()
+    return 0
+
+  if argv[0] == "__complete":
+    # Hook de autocompletado: formato máquina para shells (zsh/bash).
+    _print_complete()
     return 0
 
   name = _resolve(argv[0])

@@ -232,7 +232,27 @@ queda PENDIENTE con los css ya resueltos en staging.
 xtool info
 ```
 
-## Autocompletado (bash)
+## Autocompletado
+
+### zsh (oh-my-zsh)
+
+`completions/_xtool` es un completion nativo de zsh con descripciones y menú
+interactivo. La lista de comandos se genera con el comando oculto
+`xtool __complete` (formato `comando:descripción`), así que los tools nuevos
+de `xtool/tools/` autocompletean sin tocar nada.
+
+Activación: symlink en el fpath de oh-my-zsh (así se actualiza solo con
+`xtool update`):
+
+```bash
+mkdir -p ~/.oh-my-zsh/custom/completions
+ln -sf ~/projects/script/scripts/completions/_xtool ~/.oh-my-zsh/custom/completions/_xtool
+```
+
+Abrir terminal nueva (o `exec zsh`). Para zsh sin oh-my-zsh: poner el archivo
+en un directorio del `fpath` antes de `compinit`.
+
+### bash
 
 El script `completions/xtool.bash` agrega autocompletado con TAB:
 
@@ -253,6 +273,17 @@ source ~/projects/scripts/completions/xtool.bash
 
 Y recargar la sesión (`source ~/.bashrc` o abrir terminal nueva). Para que
 la completación dinámica funcione, `xtool` debe estar instalado y en el PATH.
+
+### Qué completa zsh
+
+- `xtool <TAB>` y `xtool help <TAB>` — comandos con su descripción (menú
+  navegable con las flechas).
+- `xtool emails <TAB>` — subcomandos (`server build watch extract dist`) y
+  flags (`--port --no-install`).
+- `xtool git-cherry <TAB>` — directorios; segundo TAB hashes del repo origen.
+- `xtool git-cherry-origin <TAB>` — directorios y flags (`--reset --min`).
+- `xtool git-deploy <TAB>` — hashes recientes del repo actual + `HEAD~N`, y
+  flags (`-y --yes -f --force --no-push`).
 
 ## Actualizar / desinstalar
 
