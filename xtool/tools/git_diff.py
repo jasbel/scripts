@@ -142,7 +142,7 @@ ORIGINAL_EXCLUDES = [
 ]
 
 # Rama con ID numérico: feat-123, issue/45, hotfix-789, dev-101, feature_1012, ...
-BRANCH_ID_RE = re.compile(r"^(?:feat|feature|issue|fix|bug|hotfix|task|story|dev)[/_-](\d+)")
+BRANCH_ID_RE = re.compile(r"^(?:feat|feature|issue|fix|bug|hotfix|task|story|dev|pre)[/_-](\d+)")
 
 BASE_EXCLUDE_PATTERNS = [
   r"\.lock$",

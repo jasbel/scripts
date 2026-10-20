@@ -216,6 +216,22 @@ queda PENDIENTE con los css ya resueltos en staging.
 - La lógica de transporte (modo acotado archivo por archivo con `git apply -3`)
   vive en `xtool/common/git_transport.py`, compartida con `git-cherry`.
 
+## info
+
+`xtool info` muestra información del arsenal en un solo lugar:
+
+- **Ruta del proyecto**, versión (leída de `pyproject.toml`), rama git y
+  cantidad de comandos.
+- **Ejecutable en uso**: qué `xtool` estás corriendo (venv del proyecto con
+  `uv run` o instalación global editable) y cuál resuelve el PATH.
+- **PATH**: si `~/.local/bin` está presente (y el comando exacto para
+  agregarlo si falta).
+- **Entorno**: versión de Python y presencia del `.env` (sin mostrar valores).
+
+```bash
+xtool info
+```
+
 ## Autocompletado (bash)
 
 El script `completions/xtool.bash` agrega autocompletado con TAB:
