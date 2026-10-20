@@ -241,6 +241,7 @@ la completación dinámica funcione, `xtool` debe estar instalado y en el PATH.
 ## Actualizar / desinstalar
 
 ```bash
+xtool update               # git pull del arsenal desde cualquier directorio
 uv tool upgrade scripts    # tras cambiar dependencias en pyproject.toml
 uv tool uninstall scripts  # elimina el comando xtool
 ```
