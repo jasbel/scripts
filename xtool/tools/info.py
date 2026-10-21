@@ -4,7 +4,7 @@ Uso:
   xtool info
 
 Qué muestra:
-  - Ruta del proyecto (este arsenal), versión y rama git.
+  - Ruta del proyecto (este arsenal), versión, rama git y remotos (GitHub).
   - Qué ejecutable xtool está en uso (venv local o instalación global de uv).
   - Si ~/.local/bin está en el PATH y cómo agregarlo si falta.
   - Entorno: Python, .env y cantidad de comandos disponibles.
@@ -58,6 +58,34 @@ def _rama() -> str:
     return "?"
 
 
+def _remotos() -> list[tuple[str, str]]:
+  """Remotos git del proyecto como pares (nombre, url)."""
+  try:
+    r = subprocess.run(
+      ["git", "-C", str(PROJECT_ROOT), "remote", "-v"],
+      capture_output=True, text=True, timeout=5,
+    )
+    if r.returncode != 0:
+      return []
+    vistos: dict[str, str] = {}
+    for linea in r.stdout.splitlines():
+      partes = linea.split()
+      if len(partes) >= 2 and "\t" in linea:
+        vistos.setdefault(partes[0], partes[1])
+    return sorted(vistos.items())
+  except Exception:
+    return []
+
+
+def _url_web(url: str) -> str | None:
+  """URL web de un remoto de GitHub (https://github.com/usuario/repo) o None."""
+  if url.startswith("git@github.com:"):
+    return "https://github.com/" + url.split(":", 1)[1].removesuffix(".git")
+  if url.startswith("https://github.com/"):
+    return url.removesuffix(".git")
+  return None
+
+
 def main(argv=None):
   argv = sys.argv[1:] if argv is None else list(argv)
 
@@ -77,6 +105,14 @@ def main(argv=None):
   print("Proyecto:")
   print(f"  Ruta:       {PROJECT_ROOT}")
   print(f"  Versión:    {_version()}  (rama: {_rama()})")
+  remotos = _remotos()
+  if remotos:
+    for nombre, url in remotos:
+      web = _url_web(url)
+      extra = f"  →  {web}" if web and web != url else ""
+      print(f"  Remoto:     {nombre}: {url}{extra}")
+  else:
+    print("  Remoto:     sin remoto configurado")
   print(f"  Comandos:   {n_tools}  (en xtool/tools/)")
   print()
   print("Ejecutable:")
