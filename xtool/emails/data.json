@@ -77,6 +77,27 @@
           "birthday": "01/01/1994"
         }
       ]
+    },
+    {
+      "imageCabin": "https://apisandbox.solocruceros.com/media/category/12066/image?date=20211104215221",
+      "categoryCabin": "MO-Exterior Bella Garantizado",
+      "passengerQty": "1 Pasajeros",
+      "passengerLabel": "PASSENGERLABEL2",
+      "numberCabin": "5661",
+      "tracker": "pendiente",
+      "descriptionCabin": "Todos los camarotes disponen de cama de matrimonio o individual (bajo petici&#243;n). Amplio guardarropa. Cuarto de ba&#241;o con ducha. TV interactiva y Tel&#233;fono. Disponibilidad de conexi&#243;n a Internet v&#237;a Wi-Fi (previo pago). Minibar y caja fuerte. Aire acondicionado. El camarote es garantizado, el n&#250;mero de camarote vendr&#225; asignado por la naviera. Algunos camarotes pueden tener la vista obstruida. Tama&#241;o aproximado &lt;14m&#178;. Dentro de la misma categor&#237;a de camarote, el tama&#241;o, la disposici&#243;n y los muebles pueden variar respecto a las im&#225;genes.",
+      "passengerListCabin": [
+        {
+          "name": false,
+          "surname": false,
+          "birthday": "01/01/2000"
+        },
+        {
+          "name": false,
+          "surname": false,
+          "birthday": "01/01/2000"
+        }
+      ]
     }
   ],
   "showSectionCabin": true,
