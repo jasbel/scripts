@@ -70,6 +70,24 @@ xtool git-diff         # analiza el diff y genera el mensaje
   generados y, si aún supera el límite, se trunca por archivo dejando un
   resumen (`--compact-summary`) de lo omitido.
 
+## run-css
+
+`xtool run-css` ejecuta `npm run css` (compilación SASS vía gulp) en todos los
+directorios `symfony_*` de solocruceros, del origen elegido:
+
+- `es` (default): `sites/solocruceros.com/DDD/1_Presentation/Web`
+- `la`: `sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web`
+
+```bash
+xtool run-css                        # origen es
+xtool run-css --origin la            # origen la (satélite latam)
+xtool run-css --base <otro/dir>      # otro directorio base arbitrario
+```
+
+- Al terminar muestra un resumen con los directorios donde el comando no se
+  pudo ejecutar (sin `package.json`/script `css` o con error de npm).
+- Devuelve código de salida 1 si alguno no se ejecutó — útil para scripts.
+
 ## git-cherry
 
 `xtool git-cherry [ruta_repo_origen] [hash_commit]` transporta un commit de otro
