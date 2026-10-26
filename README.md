@@ -262,11 +262,13 @@ xtool git-separe --sat ltp=DDD/1_Presentation/Web/latampass   # satélite extra
   el patrón), excluyendo el destino y slices viejos; prioriza ancestros del
   destino con hint (`origin`/`main`/`master`/`base`) — p.ej. sin más ramas
   `feat-44913/*` el origen será `master` y los slices nacen de él.
-- Crea `<destino>-sat/<alias>` desde el origen aplicando SOLO el diff de
-  la ruta del satélite (`git diff --binary | git apply --index`; el sufijo
-  `-sat` existe porque git no admite que coexistan las ramas `X` y
-  `X/algo`). Tras commitear **verifica** que el contenido de la ruta en el
-  slice sea idéntico al del destino.
+- Crea `<alias>/<destino>` desde el origen (p.ej. `me/feat-44913/mi-tarea`)
+  aplicando SOLO el diff de la ruta del satélite (`git diff --binary |
+  git apply --index`). El nombre conserva íntegro el de la rama destino;
+  no puede ser `<destino>/<alias>` porque git no admite que coexistan las
+  ramas `X` y `X/algo`. Tras commitear **verifica** que el contenido de la
+  ruta en el slice sea idéntico al del destino. Al final lista las ramas
+  creadas.
 - Los archivos cambiados fuera de todos los satélites se avisan (no
   entrarían en ningún slice). Por defecto **pushea** las slices creadas al
   remote de la config (default `origin`) tras crearlas; con `--no-push` las
@@ -286,7 +288,6 @@ xtool git-separe --sat ltp=DDD/1_Presentation/Web/latampass   # satélite extra
 
 ```json
 {
-  "sufijo_slice": "-sat",
   "remote": "origin",
   "satelites": {
     "me":    "DDD/1_Presentation/Web/symfony_mediterraneo",
@@ -296,6 +297,9 @@ xtool git-separe --sat ltp=DDD/1_Presentation/Web/latampass   # satélite extra
   }
 }
 ```
+
+(La clave antigua `sufijo_slice` se ignora si aún figura: los slices se
+llaman `<alias>/<destino>`.)
 
 ## info
 

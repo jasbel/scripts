@@ -20,15 +20,18 @@ Flujo interactivo:
   3. Plan: cambios por satélite según ~/.config/xtool/git-separe.json
      (alias -> ruta relativa a la raíz del repo) y aviso de archivos que
      quedan FUERA de todos los satélites (no entrarían en ningún slice).
-  4. Crea <destino>-sat/<alias> desde <origen> aplicando SOLO los cambios de
-     su ruta: git diff --binary origen..destino -- ruta | git apply --index.
-     Tras commitear VERIFICA que el contenido de la ruta en el slice sea
-     idéntico al del destino; si difiere lo avoca ruidosamente.
-     (El slice no puede llamarse <destino>/<alias>: git no permite que
-     coexistan las ramas 'X' y 'X/algo'.)
+  4. Crea <alias>/<destino> (p.ej. me/feat-44913/replicate-home-layout-search)
+     desde <origen> aplicando SOLO los cambios de su ruta: git diff --binary
+     origen..destino -- ruta | git apply --index. Tras commitear VERIFICA que
+     el contenido de la ruta en el slice sea idéntico al del destino; si
+     difiere lo avoca ruidosamente. El nombre conserva ÍNTEGRO el de la rama
+     destino; NO puede ser <destino>/<alias> porque git no permite que
+     coexistan las ramas 'X' y 'X/algo' (y el destino vive hasta que se
+     fusionan todos los slices).
   5. Vuelve a la rama original y pushea las slices creadas al remote
      (default "origin", configurable como "remote" en el JSON). Con
      --no-push las deja solo locales e imprime el comando para publicarlas.
+     Al final, en cualquier caso, lista las ramas creadas.
 
 Opciones:
   --destino <rama>   rama con todos los cambios (default: rama actual)
@@ -58,9 +61,12 @@ de entorno GIT_SEPARE_CONFIG); se crea con defaults la primera vez:
     }
   }
 
-- sufijo_slice: cómo se llama cada rama slice: <destino><sufijo>/<alias>
-  (p.ej. feat-44913/replicate-home-layout-search-sat/me).
-- remote: a dónde publica --push (default "origin").
+- remote: a dónde se publican las slices (default "origin").
+
+Cada rama slice se llama <alias>/<destino> (p.ej.
+me/feat-44913/replicate-home-layout-search); no se configura (ver flujo
+paso 4). La clave antigua "sufijo_slice" se ignora si aún figura en el
+JSON.
 
 Después de fusionar TODOS los slices a master, borra la rama destino:
 jamás la fusiones después de sus slices (son los mismos cambios con
@@ -92,12 +98,14 @@ PATRON_PREFIJO = re.compile(r"^([A-Za-z][A-Za-z0-9._-]*-\d+)/(.+)$")
 HINTS_ORIGEN = ("origin", "main", "master", "base")
 # Bases del repo consideradas siempre como candidatas a origen (en orden).
 BASES_ORIGEN = ("master", "main")
-SUFIJO_DEFECTO = "-sat"
 REMOTO_DEFECTO = "origin"
 
 
-def nombre_slice(destino: str, sufijo: str, alias: str) -> str:
-  return f"{destino}{sufijo}/{alias}"
+def nombre_slice(destino: str, alias: str) -> str:
+  """Slice de un satélite: el nombre íntegro de la rama destino con el alias
+  delante (me/feat-44913/tarea). No puede ser <destino>/<alias>: git no
+  permite que coexistan las ramas 'X' y 'X/algo'."""
+  return f"{alias}/{destino}"
 
 
 def mostrar_ruta(ruta: Path) -> str:
@@ -108,13 +116,13 @@ def mostrar_ruta(ruta: Path) -> str:
 def cargar_config():
   """Lee (creándola si no existe) la configuración JSON de satélites.
 
-  Devuelve (dict alias -> ruta, sufijo_slice, remote) o (None, None, None).
+  Devuelve (dict alias -> ruta, remote) o (None, None).
   """
   ruta = Path(os.environ.get(ENV_CONFIG, "") or CONFIG_DEFAULT)
   if not ruta.is_file():
     ruta.parent.mkdir(parents=True, exist_ok=True)
     ruta.write_text(json.dumps(
-      {"sufijo_slice": SUFIJO_DEFECTO, "remote": REMOTO_DEFECTO, "satelites": SAT_DEFECTO},
+      {"remote": REMOTO_DEFECTO, "satelites": SAT_DEFECTO},
       indent=2) + "\n", encoding="utf-8")
     print(f"[config] se creó {mostrar_ruta(ruta)} con los satélites por defecto")
   try:
@@ -122,24 +130,22 @@ def cargar_config():
   except (json.JSONDecodeError, OSError) as e:
     print(f"ERROR: no se pudo leer {ruta}: {e}")
     return None, None
+  if isinstance(datos, dict) and "sufijo_slice" in datos:
+    print("[config] 'sufijo_slice' ya no se usa: los slices se llaman <alias>/<destino>")
   sats = datos.get("satelites") if isinstance(datos, dict) else None
   if not isinstance(sats, dict) or not sats:
     print(f"ERROR: {ruta} debe tener un objeto no vacío bajo la clave 'satelites'")
-    return None, None, None
+    return None, None
   limpio = {}
   for alias, ruta_sat in sats.items():
     alias, ruta_sat = str(alias).strip().lower(), str(ruta_sat).strip().strip("/")
-    if alias and ruta_sat and not alias.startswith("-"):
+    if alias and ruta_sat and not alias.startswith("-") and "/" not in alias:
       limpio[alias] = ruta_sat
   if not limpio:
-    print(f"ERROR: {ruta} no define satélites válidos (alias=ruta relativa)")
-    return None, None, None
-  sufijo = str(datos.get("sufijo_slice") or SUFIJO_DEFECTO).strip()
-  if not sufijo.startswith("-") or "/" in sufijo:
-    print("ERROR: sufijo_slice debe empezar con '-' y no contener '/' (p.ej. '-sat')")
-    return None, None, None
+    print(f"ERROR: {ruta} no define satélites válidos (alias=ruta relativa, alias sin '/')")
+    return None, None
   remote = str(datos.get("remote") or REMOTO_DEFECTO).strip() or REMOTO_DEFECTO
-  return limpio, sufijo, remote
+  return limpio, remote
 
 
 def existe_commit(ref: str) -> bool:
@@ -160,20 +166,19 @@ def prefijo_rama(rama: str):
   return m.group(1) if m else None
 
 
-def candidatos_origen(destino: str, aliases, sufijo: str):
+def candidatos_origen(destino: str, aliases):
   """Candidatas a origen: bases del repo (master/main) + ramas con el mismo
   prefijo-id, aptas para ser origen.
 
-  Excluye el destino, sus slices (<destino><sufijo>/...) y ramas que
-  terminan en /<alias> (slices viejos). Orden: ancestra+hint > ancestra.
+  Excluye el destino y ramas que terminan en /<alias> (slices viejos); los
+  slices nuevos (<alias>/<destino>) no pasan el filtro de prefijo. Orden:
+  ancestra+hint > ancestra.
   """
   prefijo = prefijo_rama(destino)
   posibles = list(BASES_ORIGEN)
   if prefijo:
     for rama in ramas_locales():
       if rama == destino or rama.startswith(destino + "/"):
-        continue
-      if rama.startswith(destino + sufijo + "/"):
         continue
       if not rama.startswith(prefijo + "/"):
         continue
@@ -192,9 +197,9 @@ def candidatos_origen(destino: str, aliases, sufijo: str):
   return cands
 
 
-def elegir_origen(destino: str, aliases, sufijo: str, yes: bool):
+def elegir_origen(destino: str, aliases, yes: bool):
   """Autodetecta/pregunta el origen. Devuelve el nombre o None."""
-  cands = candidatos_origen(destino, aliases, sufijo)
+  cands = candidatos_origen(destino, aliases)
   if cands:
     pref = prefijo_rama(destino)
     alcance = f"bases (master/main) y ramas {pref}/*" if pref else "bases (master/main)"
@@ -306,7 +311,7 @@ def _ejecutar(opts):
     print("ℹ tienes cambios sin commitear: se IGNORAN (los slices capturan solo lo commiteado)")
 
   # ── Satélites (config + overrides) ──
-  sats, sufijo, remote = cargar_config()
+  sats, remote = cargar_config()
   if sats is None:
     return 1
   for extra in opts["sats_extra"]:
@@ -336,7 +341,7 @@ def _ejecutar(opts):
       print(f"ERROR: la rama origen '{origen}' no existe")
       return 1
   else:
-    origen = elegir_origen(destino, set(sats), sufijo, opts["yes"])
+    origen = elegir_origen(destino, set(sats), opts["yes"])
     if not origen:
       return 1
   if origen == destino:
@@ -369,15 +374,17 @@ def _ejecutar(opts):
     print("    ✓ sin cambios fuera de satélites")
 
   # ── Ramas a crear / conflictos existentes ──
-  base_slice = destino + sufijo
-  if run("git", "show-ref", "--verify", "--quiet", f"refs/heads/{base_slice}", check=False).returncode == 0:
-    print(f"ERROR: existe la rama '{base_slice}' y git no permite crear '{base_slice}/<alias>' junto a ella")
-    print(f"  (git no admite que coexistan las ramas 'X' y 'X/algo'; renómbrala o bórrala)")
-    return 1
+  # git no permite coexistir 'X' y 'X/algo': una rama llamada justo <alias>
+  # bloquearía crear <alias>/<destino>.
+  for alias in dict.fromkeys(alias for alias, _r, _n in plan):
+    if run("git", "show-ref", "--verify", "--quiet", f"refs/heads/{alias}", check=False).returncode == 0:
+      print(f"ERROR: existe la rama '{alias}' y git no permite crear '{alias}/{destino}' junto a ella")
+      print("  (git no admite que coexistan las ramas 'X' y 'X/algo'; renómbrala o bórrala)")
+      return 1
   print(f"\n→ ramas a crear desde {origen}:")
   por_crear = []
   for alias, _ruta, _n in plan:
-    rama = nombre_slice(destino, sufijo, alias)
+    rama = nombre_slice(destino, alias)
     existe = run("git", "show-ref", "--verify", "--quiet", f"refs/heads/{rama}", check=False).returncode == 0
     if existe and not opts["force"]:
       print(f"    ✗ {rama} YA EXISTE (usa --force para recrearla)")
@@ -410,7 +417,7 @@ def _ejecutar(opts):
   ok_total = True
   try:
     for alias, ruta, _n in plan:
-      rama = nombre_slice(destino, sufijo, alias)
+      rama = nombre_slice(destino, alias)
       if run("git", "show-ref", "--verify", "--quiet", f"refs/heads/{rama}", check=False).returncode == 0:
         run("git", "branch", "-D", rama)
       run("git", "checkout", "-q", "-b", rama, origen, cwd=wt)
@@ -446,6 +453,11 @@ def _ejecutar(opts):
   finally:
     run("git", "worktree", "remove", "--force", str(wt), check=False)
     run("git", "worktree", "prune", check=False)
+
+  if creadas:
+    print(f"\n→ ramas creadas ({destino} sigue intacta):")
+    for rama in creadas:
+      print(f"    {rama}")
 
   if opts["push"] and creadas:
     print(f"\n→ publicando {len(creadas)} slices en '{remote}' ...")
