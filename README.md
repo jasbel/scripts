@@ -181,6 +181,10 @@ xtool git-deploy --no-push    # aplica y commitea, sin pushear
 - Resumen + Enter antes de actuar (Ctrl+C cancela). Validaciones: destino
   limpio (si está sucio se excluye, salvo `-f`/`--force`); la rama activa se
   compara con la esperada del mapeo y **solo avisa** si difiere.
+- Antes de pushear se actualiza el destino con `git pull --rebase --autostash
+  <remote> <rama>` (se omite si la rama aún no existe en el remote). Si el
+  rebase conflictúa se aborta y el destino queda SIN PUSH, con el commit
+  local intacto para resolver a mano.
 - El push es `git push <remote del mapeo> <rama activa del destino>`; no hace
   falta pushear el origen antes: los blobs se leen del repo local.
 - Mensaje: `[pre] <subject original>` (con `Origen: <sha>` en el cuerpo y el

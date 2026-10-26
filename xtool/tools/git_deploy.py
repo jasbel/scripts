@@ -24,8 +24,12 @@ Automatiza el flujo "ir a sc_clone, buscar el commit, cherry-pick, push":
        [pre] <subject más nuevo> (N commits)   (rango, aplastado)
      El cuerpo lista el/los commit(s) de origen ('Origen: <sha>') y se
      conserva el autor original.
-  6. Pushea: git push <remote del mapeo> <rama activa del destino>.
-     Con --no-push aplica y commitea sin pushear.
+  6. Antes de pushear actualiza el destino con
+     'git pull --rebase --autostash <remote> <rama activa>' (si la rama ya
+     existe en el remote; si el rebase conflictúa se aborta y el destino
+     queda SIN PUSH, con el commit local intacto).
+  7. Pushea: git push <remote del mapeo> <rama activa del destino>.
+     Con --no-push aplica y commitea sin pushear (sin pull).
 
 Argumentos:
   - commit_o_rango: commit (abc1234, HEAD~1) o rango (abc..def, HEAD~2..HEAD).
@@ -366,6 +370,32 @@ def resolver_conflictos_css(plan, origen_repo: Path, commit_final: str):
   return resueltos
 
 
+def actualizar_destino(plan):
+  """Trae lo nuevo del remote con pull --rebase antes de pushear.
+
+  Si la rama aún no existe en el remote (push inicial) se omite. Si el rebase
+  conflictúa se aborta (el commit local queda intacto) y devuelve False.
+  """
+  repo = plan["destino_repo"]
+  remote, rama = plan["remote"], plan["rama_activa"]
+  heads = run("git", "ls-remote", "--heads", remote, rama, cwd=repo, check=False)
+  if heads.returncode != 0 or not heads.stdout.strip():
+    print(f"==> La rama {rama} aún no existe en {remote} (push inicial); se omite el pull.")
+    return True
+  print(f"==> Actualizando el destino antes de pushear: git pull --rebase {remote} {rama}")
+  pull = run("git", "pull", "--rebase", "--autostash", remote, rama, cwd=repo, check=False)
+  if pull.returncode == 0:
+    print(f"==> Destino actualizado: {out('git', 'log', '-1', '--oneline', cwd=repo).strip()}")
+    return True
+  run("git", "rebase", "--abort", cwd=repo, check=False)  # sin rebase en curso es inofensivo
+  print(f"ERROR: falló git pull --rebase {remote} {rama}; se abortó el rebase y NO se pushea:")
+  print((pull.stderr.strip() or pull.stdout.strip())[:1000])
+  print("    El commit local sigue intacto; resuelve a mano y pushea:")
+  print(f"      git -C {repo} pull --rebase {remote} {rama}   # resuelve y 'git rebase --continue'")
+  print(f"      git -C {repo} push {remote} {rama}")
+  return False
+
+
 def desplegar(plan, commits, origen_repo, patch_file, msg_file, autor, no_push):
   """Aplica los commits en el destino, commitea y pushea. Devuelve el estado."""
   nombre = plan["origen_sub"] or "(raíz)"
@@ -422,11 +452,14 @@ def desplegar(plan, commits, origen_repo, patch_file, msg_file, autor, no_push):
     print(f"    git -C {plan['destino_repo']} push {plan['remote']} {plan['rama_activa']}")
     return "ok"
 
+  if not actualizar_destino(plan):
+    return "push_error"
+
   push = run("git", "push", plan["remote"], plan["rama_activa"], cwd=plan["destino_repo"], check=False)
   if push.returncode != 0:
     print(f"ERROR: no se pudo pushear a {plan['remote']}/{plan['rama_activa']}:")
     print((push.stderr.strip() or push.stdout.strip())[:1000])
-    print("    ¿Avanzó preproducción? Revisa (git pull --rebase) y reintenta el push.")
+    print("    El pull --rebase previo no alcanzó (el remote avanzó entre medias); resuelve y reintenta el push.")
     return "push_error"
   print(f"==> Pusheado a {plan['remote']}/{plan['rama_activa']}")
   return "ok"
@@ -592,7 +625,7 @@ def main(argv=None):
       print(f"  PENDIENTE {nombre} -> {mostrar_ruta(plan['destino'])} (revisar: conflictos o build de css; sin commit/push)")
       fallos += 1
     elif estado == "push_error":
-      print(f"  SIN PUSH  {nombre} -> {mostrar_ruta(plan['destino'])} (commit creado, push fallido)")
+      print(f"  SIN PUSH  {nombre} -> {mostrar_ruta(plan['destino'])} (commit creado; falló el pull/push)")
       fallos += 1
     else:
       print(f"  ERROR     {nombre} -> {mostrar_ruta(plan['destino'])}")
