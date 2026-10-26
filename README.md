@@ -238,6 +238,65 @@ queda PENDIENTE con los css ya resueltos en staging.
 - La lógica de transporte (modo acotado archivo por archivo con `git apply -3`)
   vive en `xtool/common/git_transport.py`, compartida con `git-cherry`.
 
+## git-separe
+
+`xtool git-separe` separa los cambios de una rama en **ramas satélite por
+servidor web** (slices), para poder fusionar/desplegar/revertir cada
+satélite por separado en el monorepo de solocruceros (el CI despliega por
+satélite según la ruta que cambia).
+
+```bash
+cd ~/projects/symfony-sites/sites/solocruceros.com   # sobre la rama con TODOS los cambios
+xtool git-separe            # interactivo: detecta destino (rama actual) y origen
+xtool git-separe --dry-run  # solo el plan
+xtool git-separe --force    # recrea slices existentes
+xtool git-separe --no-push  # crea las slices SIN publicarlas (default: pushea)
+xtool git-separe -y         # sin preguntar (falla si no autodetecta el origen)
+xtool git-separe --sat ltp=DDD/1_Presentation/Web/latampass   # satélite extra
+```
+
+- **destino**: rama actual por defecto (`--destino` para otra); debe tener
+  el patrón `<prefijo-id>/<nombre>` (p.ej. `feat-44913/...`).
+- **origen**: autodetección entre las bases del repo (`master`, o `main` si
+  no hay `master`) y las ramas con el MISMO prefijo-id (si el destino tiene
+  el patrón), excluyendo el destino y slices viejos; prioriza ancestros del
+  destino con hint (`origin`/`main`/`master`/`base`) — p.ej. sin más ramas
+  `feat-44913/*` el origen será `master` y los slices nacen de él.
+- Crea `<destino>-sat/<alias>` desde el origen aplicando SOLO el diff de
+  la ruta del satélite (`git diff --binary | git apply --index`; el sufijo
+  `-sat` existe porque git no admite que coexistan las ramas `X` y
+  `X/algo`). Tras commitear **verifica** que el contenido de la ruta en el
+  slice sea idéntico al del destino.
+- Los archivos cambiados fuera de todos los satélites se avisan (no
+  entrarían en ningún slice). Por defecto **pushea** las slices creadas al
+  remote de la config (default `origin`) tras crearlas; con `--no-push` las
+  deja solo locales e imprime el comando (`-p`/`--push` se acepta por
+  compatibilidad, ya no hace falta).
+- Ejecuta en un **worktree temporal**: tu working tree no se toca y los
+  cambios sin commitear se ignoran (los slices capturan solo lo commiteado
+  entre origen y destino).
+- Tras fusionar TODOS los slices a master, **borra la rama destino**: no la
+  fusiones nunca después de sus slices (mismos cambios con commits
+  distintos => conflictos duplicados).
+
+### Configuración
+
+`~/.config/xtool/git-separe.json` (o la ruta de la variable
+`GIT_SEPARE_CONFIG`); se crea con defaults la primera vez:
+
+```json
+{
+  "sufijo_slice": "-sat",
+  "remote": "origin",
+  "satelites": {
+    "me":    "DDD/1_Presentation/Web/symfony_mediterraneo",
+    "sc":    "DDD/1_Presentation/Web/symfony_home",
+    "islas": "DDD/1_Presentation/Web/symfony_islasgriegas",
+    "lujo":  "DDD/1_Presentation/Web/symfony_lujo"
+  }
+}
+```
+
 ## info
 
 `xtool info` muestra información del arsenal en un solo lugar:
