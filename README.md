@@ -269,13 +269,13 @@ xtool git-separe --sat ltp=DDD/1_Presentation/Web/latampass   # satélite extra
   el patrón), excluyendo el destino y slices viejos; prioriza ancestros del
   destino con hint (`origin`/`main`/`master`/`base`) — p.ej. sin más ramas
   `feat-44913/*` el origen será `master` y los slices nacen de él.
-- Crea `<alias>/<destino>` desde el origen (p.ej. `me/feat-44913/mi-tarea`)
-  aplicando SOLO el diff de la ruta del satélite (`git diff --binary |
-  git apply --index`). El nombre conserva íntegro el de la rama destino;
-  no puede ser `<destino>/<alias>` porque git no admite que coexistan las
-  ramas `X` y `X/algo`. Tras commitear **verifica** que el contenido de la
-  ruta en el slice sea idéntico al del destino. Al final lista las ramas
-  creadas.
+- Crea una rama slice por satélite desde el origen aplicando SOLO el diff
+  de su ruta (`git diff --binary | git apply --index`). Nombres: con el
+  patrón habitual `<prefijo-id>/<nombre>` el alias va tras el id, p.ej.
+  `feat-44913/cl/mi-tarea`; sin patrón, `<destino>-sat/<alias>` (no puede
+  ser `<destino>/<alias>`: git no admite que coexistan las ramas `X` y
+  `X/algo`). Tras commitear **verifica** que el contenido de la ruta en el
+  slice sea idéntico al del destino. Al final lista las ramas creadas.
 - Los archivos cambiados fuera de todos los satélites se avisan (no
   entrarían en ningún slice). Por defecto **pushea** las slices creadas al
   remote de la config (default `origin`) tras crearlas; con `--no-push` las
