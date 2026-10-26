@@ -17,9 +17,13 @@ Flujo interactivo:
      nombre tenga un hint (origin/main/master/base); la mejor es el default
      del prompt — p.ej. sin más ramas feat-44913/* el origen será master y
      los slices nacen de él (el diff capturado es destino..master).
-  3. Plan: cambios por satélite según ~/.config/xtool/git-separe.json
-     (alias -> ruta relativa a la raíz del repo) y aviso de archivos que
-     quedan FUERA de todos los satélites (no entrarían en ningún slice).
+  3. Plan: detecta en qué monorepo estás (p.ej. europa/latam) localizando
+     los satélites de ~/.config/xtool/git-separe.json en el checkout: la
+     ruta tal cual o, si el layout difiere (en latam el sitio cuelga de
+     solocruceros.com/), buscándola por nombre con git ls-files (--repo
+     fuerza la sección). Calcula cambios por satélite (alias -> ruta real
+     relativa a la raíz del repo) y avisa de los archivos que quedan FUERA
+     de todos los satélites (no entrarían en ningún slice).
   4. Crea <alias>/<destino> (p.ej. me/feat-44913/replicate-home-layout-search)
      desde <origen> aplicando SOLO los cambios de su ruta: git diff --binary
      origen..destino -- ruta | git apply --index. Tras commitear VERIFICA que
@@ -36,6 +40,8 @@ Flujo interactivo:
 Opciones:
   --destino <rama>   rama con todos los cambios (default: rama actual)
   --origen <rama>    rama base limpia (default: autodetección interactiva)
+  --repo <id>        fuerza la sección 'repos' de la config (p.ej. latam);
+                     default: autodetección por rutas de satélite existentes
   --sat a=ruta       agrega/sobrescribe un satélite (repetible),
                      p.ej. --sat ltp=DDD/1_Presentation/Web/latampass
   --dry-run          solo muestra el plan, no crea nada
@@ -51,17 +57,32 @@ Configuración en ~/.config/xtool/git-separe.json (o la ruta de la variable
 de entorno GIT_SEPARE_CONFIG); se crea con defaults la primera vez:
 
   {
-    "sufijo_slice": "-sat",
     "remote": "origin",
-    "satelites": {
-      "me":    "DDD/1_Presentation/Web/symfony_mediterraneo",
-      "sc":    "DDD/1_Presentation/Web/symfony_home",
-      "islas": "DDD/1_Presentation/Web/symfony_islasgriegas",
-      "lujo":  "DDD/1_Presentation/Web/symfony_lujo"
+    "repos": {
+      "europa": {
+        "satelites": {
+          "me":    "DDD/1_Presentation/Web/symfony_mediterraneo",
+          "sc":    "DDD/1_Presentation/Web/symfony_home",
+          "islas": "DDD/1_Presentation/Web/symfony_islasgriegas",
+          "lujo":  "DDD/1_Presentation/Web/symfony_lujo"
+        }
+      },
+      "latam": {
+        "satelites": {
+          "cl":    "DDD/1_Presentation/Web/symfony_chile",
+          "cr":    "DDD/1_Presentation/Web/symfony_costarica",
+          "mx":    "DDD/1_Presentation/Web/symfony_mexico",
+          "co":    "DDD/1_Presentation/Web/symfony_colombia"
+        }
+      }
     }
   }
 
 - remote: a dónde se publican las slices (default "origin").
+- repos: una sección por monorepo; se usa la que tenga MÁS rutas de
+  satélite presentes en el checkout actual (--repo fuerza una concreta;
+  si no existe ninguna ruta, error). El formato antiguo ('satelites'
+  plano) sigue funcionando como repo único.
 
 Cada rama slice se llama <alias>/<destino> (p.ej.
 me/feat-44913/replicate-home-layout-search); no se configura (ver flujo
@@ -86,11 +107,25 @@ from xtool.common.git_transport import out, run
 ENV_CONFIG = "GIT_SEPARE_CONFIG"
 CONFIG_DEFAULT = Path.home() / ".config" / "xtool" / "git-separe.json"
 
-SAT_DEFECTO = {
+SAT_DEFECTO_EUROPA = {
   "me": "DDD/1_Presentation/Web/symfony_mediterraneo",
   "sc": "DDD/1_Presentation/Web/symfony_home",
   "islas": "DDD/1_Presentation/Web/symfony_islasgriegas",
   "lujo": "DDD/1_Presentation/Web/symfony_lujo",
+}
+
+SAT_DEFECTO_LATAM = {
+  "cl": "DDD/1_Presentation/Web/symfony_chile",
+  "cr": "DDD/1_Presentation/Web/symfony_costarica",
+  "mx": "DDD/1_Presentation/Web/symfony_mexico",
+  "co": "DDD/1_Presentation/Web/symfony_colombia",
+}
+
+# Una sección por monorepo; el tool elige según qué rutas de satélite
+# existen en el checkout (ver elegir_repo).
+REPOS_DEFECTO = {
+  "europa": {"satelites": SAT_DEFECTO_EUROPA},
+  "latam": {"satelites": SAT_DEFECTO_LATAM},
 }
 
 # <prefijo-con-id>/<nombre>: feat-44913/replicate-home-layout-search
@@ -113,29 +148,11 @@ def mostrar_ruta(ruta: Path) -> str:
   return str(ruta).replace(str(Path.home()), "~", 1)
 
 
-def cargar_config():
-  """Lee (creándola si no existe) la configuración JSON de satélites.
-
-  Devuelve (dict alias -> ruta, remote) o (None, None).
-  """
-  ruta = Path(os.environ.get(ENV_CONFIG, "") or CONFIG_DEFAULT)
-  if not ruta.is_file():
-    ruta.parent.mkdir(parents=True, exist_ok=True)
-    ruta.write_text(json.dumps(
-      {"remote": REMOTO_DEFECTO, "satelites": SAT_DEFECTO},
-      indent=2) + "\n", encoding="utf-8")
-    print(f"[config] se creó {mostrar_ruta(ruta)} con los satélites por defecto")
-  try:
-    datos = json.loads(ruta.read_text(encoding="utf-8"))
-  except (json.JSONDecodeError, OSError) as e:
-    print(f"ERROR: no se pudo leer {ruta}: {e}")
-    return None, None
-  if isinstance(datos, dict) and "sufijo_slice" in datos:
-    print("[config] 'sufijo_slice' ya no se usa: los slices se llaman <alias>/<destino>")
-  sats = datos.get("satelites") if isinstance(datos, dict) else None
+def limpiar_satelites(sats, ruta):
+  """Valida/normaliza el dict alias->ruta de una sección; None si inválido."""
   if not isinstance(sats, dict) or not sats:
     print(f"ERROR: {ruta} debe tener un objeto no vacío bajo la clave 'satelites'")
-    return None, None
+    return None
   limpio = {}
   for alias, ruta_sat in sats.items():
     alias, ruta_sat = str(alias).strip().lower(), str(ruta_sat).strip().strip("/")
@@ -143,9 +160,109 @@ def cargar_config():
       limpio[alias] = ruta_sat
   if not limpio:
     print(f"ERROR: {ruta} no define satélites válidos (alias=ruta relativa, alias sin '/')")
+    return None
+  return limpio
+
+
+def cargar_config():
+  """Lee (creándola si no existe) la configuración JSON de satélites.
+
+  Devuelve (dict repo_id -> dict alias -> ruta, remote) o (None, None).
+  Admite el formato antiguo con 'satelites' plano (un solo repo).
+  """
+  ruta = Path(os.environ.get(ENV_CONFIG, "") or CONFIG_DEFAULT)
+  if not ruta.is_file():
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(json.dumps(
+      {"remote": REMOTO_DEFECTO, "repos": REPOS_DEFECTO},
+      indent=2) + "\n", encoding="utf-8")
+    print(f"[config] se creó {mostrar_ruta(ruta)} con los satélites por defecto")
+  try:
+    datos = json.loads(ruta.read_text(encoding="utf-8"))
+  except (json.JSONDecodeError, OSError) as e:
+    print(f"ERROR: no se pudo leer {ruta}: {e}")
     return None, None
+  if not isinstance(datos, dict):
+    print(f"ERROR: {ruta} debe ser un objeto JSON")
+    return None, None
+  if "sufijo_slice" in datos:
+    print("[config] 'sufijo_slice' ya no se usa: los slices se llaman <alias>/<destino>")
+  secciones = datos.get("repos")
+  if isinstance(secciones, dict) and secciones:
+    repos = {}
+    for repo_id, bloque in secciones.items():
+      sats = limpiar_satelites(bloque.get("satelites") if isinstance(bloque, dict) else None, ruta)
+      if sats is None:
+        return None, None
+      repos[str(repo_id).strip()] = sats
+  else:
+    if "satelites" in datos:
+      print("[config] 'satelites' plano (formato antiguo): se trata como repo único; "
+            "mueve 'satelites' dentro de 'repos' para soportar varios monorepos")
+    sats = limpiar_satelites(datos.get("satelites"), ruta)
+    if sats is None:
+      return None, None
+    repos = {"default": sats}
   remote = str(datos.get("remote") or REMOTO_DEFECTO).strip() or REMOTO_DEFECTO
-  return limpio, remote
+  return repos, remote
+
+
+def resolver_ruta_satelite(ruta: str) -> str:
+  """Devuelve la ruta REAL del satélite respecto a la raíz git.
+
+  Si la ruta configurada existe tal cual, se devuelve; si no, se localiza
+  por el nombre de su último componente con git ls-files (los monorepos no
+  comparten layout: en latam el sitio cuelga de solocruceros.com/ y en
+  europa no). '' si no se encuentra nada.
+  """
+  if Path(ruta).is_dir():
+    return ruta
+  nombre = ruta.rstrip("/").rsplit("/", 1)[-1]
+  for linea in out("git", "ls-files", "--", f"*{nombre}*").splitlines():
+    partes = linea.strip().split("/")
+    if nombre in partes:
+      return "/".join(partes[: partes.index(nombre) + 1])
+  return ""
+
+
+def elegir_repo(repos, repo_opt, con_extra=False):
+  """Detecta en qué monorepo estás: gana la sección con más satélites
+  localizables (ruta exacta o encontrada por nombre en el index).
+
+  Devuelve (repo_id, satelites alias -> ruta REAL) o (None, None).
+  --repo fuerza la sección; con_extra (=--sat) relaja el error si no se
+  localiza ninguno (los overrides aportan las rutas).
+  """
+  if repo_opt:
+    if repo_opt not in repos:
+      print(f"ERROR: no hay ningún repo '{repo_opt}' en la config (repos: {', '.join(repos)})")
+      return None, None
+    elegido, mejor_n = repo_opt, None
+  else:
+    puntuados = [(sum(1 for r in sats.values() if resolver_ruta_satelite(r)), rid)
+                 for rid, sats in repos.items()]
+    mejor_n, elegido = max(puntuados, key=lambda p: p[0])
+    detalle = ", ".join(f"{rid} {n}/{len(repos[rid])}" for n, rid in puntuados)
+    if mejor_n == 0 and not con_extra:
+      print(f"ERROR: ningún satélite de la config se localiza en este checkout ({detalle}).")
+      print("  ¿Estás en otro monorepo? Usa --repo <id> o revisa 'repos' en la config.")
+      return None, None
+    if mejor_n == 0:
+      print(f"  ⚠ ningún satélite localizado aquí ({detalle}); uso '{elegido}' por los --sat dados")
+    else:
+      if sum(1 for n, _ in puntuados if n == mejor_n) > 1:
+        print(f"  ⚠ empate entre repos ({detalle}); elijo '{elegido}' (usa --repo para forzar)")
+      print(f"→ repo: {elegido}  ({mejor_n}/{len(repos[elegido])} satélites localizados)")
+  sats = {}
+  for alias, ruta in repos[elegido].items():
+    real = resolver_ruta_satelite(ruta)
+    if real and real != ruta:
+      print(f"  ↳ [{alias}] {ruta} -> {real}")
+    elif not real:
+      print(f"  ⚠ [{alias}] no localizo '{ruta}' en este checkout; lo dejo tal cual (sin cambios)")
+      real = ruta
+    sats[alias] = real
+  return elegido, sats
 
 
 def existe_commit(ref: str) -> bool:
@@ -253,7 +370,7 @@ def archivos_cambiados(origen: str, destino: str, ruta: str = None):
 
 
 def parsear_argv(argv):
-  destino = origen = None
+  destino = origen = repo = None
   sats_extra, dry, force, yes, no_push = [], False, False, False, False
   i = 0
   while i < len(argv):
@@ -261,12 +378,14 @@ def parsear_argv(argv):
     if a in ("-h", "--help"):
       print(__doc__)
       return None
-    if a in ("--destino", "--origen", "--sat") and i + 1 < len(argv):
+    if a in ("--destino", "--origen", "--sat", "--repo") and i + 1 < len(argv):
       val = argv[i + 1]
       if a == "--destino":
         destino = val
       elif a == "--origen":
         origen = val
+      elif a == "--repo":
+        repo = val
       else:
         sats_extra.append(val)
       i += 2
@@ -283,7 +402,7 @@ def parsear_argv(argv):
     else:
       print(f"Argumento desconocido: {a}\nVer: xtool help git-separe")
       return None
-  opts = {"destino": destino, "origen": origen, "sats_extra": sats_extra,
+  opts = {"destino": destino, "origen": origen, "sats_extra": sats_extra, "repo": repo,
           "dry": dry, "force": force, "yes": yes, "push": not no_push}
   return opts
 
@@ -310,8 +429,11 @@ def _ejecutar(opts):
   if run("git", "diff-index", "--quiet", "HEAD", "--", check=False).returncode != 0:
     print("ℹ tienes cambios sin commitear: se IGNORAN (los slices capturan solo lo commiteado)")
 
-  # ── Satélites (config + overrides) ──
-  sats, remote = cargar_config()
+  # ── Satélites (config + detección de monorepo + overrides) ──
+  repos, remote = cargar_config()
+  if repos is None:
+    return 1
+  _repo, sats = elegir_repo(repos, opts["repo"], con_extra=bool(opts["sats_extra"]))
   if sats is None:
     return 1
   for extra in opts["sats_extra"]:

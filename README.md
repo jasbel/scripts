@@ -242,18 +242,25 @@ queda PENDIENTE con los css ya resueltos en staging.
 
 `xtool git-separe` separa los cambios de una rama en **ramas satélite por
 servidor web** (slices), para poder fusionar/desplegar/revertir cada
-satélite por separado en el monorepo de solocruceros (el CI despliega por
-satélite según la ruta que cambia).
+satélite por separado en los monorepos de solocruceros — europa y latam
+(el CI despliega por satélite según la ruta que cambia).
 
 ```bash
 cd ~/projects/symfony-sites/sites/solocruceros.com   # sobre la rama con TODOS los cambios
-xtool git-separe            # interactivo: detecta destino (rama actual) y origen
+xtool git-separe            # interactivo: detecta repo, destino (rama actual) y origen
+xtool git-separe --repo latam   # fuerza la sección de monorepo de la config
 xtool git-separe --dry-run  # solo el plan
 xtool git-separe --force    # recrea slices existentes
 xtool git-separe --no-push  # crea las slices SIN publicarlas (default: pushea)
 xtool git-separe -y         # sin preguntar (falla si no autodetecta el origen)
 xtool git-separe --sat ltp=DDD/1_Presentation/Web/latampass   # satélite extra
 ```
+
+- **repo**: se detecta el monorepo eligiendo la sección de `repos` de la
+  config con más satélites localizables en el checkout: la ruta tal cual
+  o, si el layout difiere (en latam el sitio cuelga de `solocruceros.com/`
+  respecto a la raíz git), buscándola por nombre con `git ls-files`;
+  `--repo <id>` la fuerza y `--sat` agrega satélites puntuales.
 
 - **destino**: rama actual por defecto (`--destino` para otra); debe tener
   el patrón `<prefijo-id>/<nombre>` (p.ej. `feat-44913/...`).
@@ -289,17 +296,31 @@ xtool git-separe --sat ltp=DDD/1_Presentation/Web/latampass   # satélite extra
 ```json
 {
   "remote": "origin",
-  "satelites": {
-    "me":    "DDD/1_Presentation/Web/symfony_mediterraneo",
-    "sc":    "DDD/1_Presentation/Web/symfony_home",
-    "islas": "DDD/1_Presentation/Web/symfony_islasgriegas",
-    "lujo":  "DDD/1_Presentation/Web/symfony_lujo"
+  "repos": {
+    "europa": {
+      "satelites": {
+        "me":    "DDD/1_Presentation/Web/symfony_mediterraneo",
+        "sc":    "DDD/1_Presentation/Web/symfony_home",
+        "islas": "DDD/1_Presentation/Web/symfony_islasgriegas",
+        "lujo":  "DDD/1_Presentation/Web/symfony_lujo"
+      }
+    },
+    "latam": {
+      "satelites": {
+        "cl":    "DDD/1_Presentation/Web/symfony_chile",
+        "cr":    "DDD/1_Presentation/Web/symfony_costarica",
+        "mx":    "DDD/1_Presentation/Web/symfony_mexico",
+        "co":    "DDD/1_Presentation/Web/symfony_colombia"
+      }
+    }
   }
 }
 ```
 
-(La clave antigua `sufijo_slice` se ignora si aún figura: los slices se
-llaman `<alias>/<destino>`.)
+- Una sección de `repos` por monorepo; el tool usa la que tenga más rutas
+  de satélite presentes en el checkout (`--repo <id>` la fuerza).
+- El formato antiguo (`satelites` plano) sigue funcionando como repo único
+  (se avisa); la clave ya inexistente `sufijo_slice` se ignora.
 
 ## info
 
