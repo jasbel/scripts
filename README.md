@@ -1,6 +1,7 @@
 # scripts / xtool
 
-Arsenal de herramientas globales expuesto como comando `xtool`.
+Arsenal de herramientas globales expuesto como comando `xtool`
+(alias corto: `x` — ambos apuntan al mismo CLI, p.ej. `x info` equivale a `xtool info`).
 Cada herramienta es un módulo en `xtool/tools/` y se invoca como `xtool <comando>`.
 
 ## Instalar el comando `xtool` en esta Mac
@@ -32,7 +33,26 @@ Comprobar instalación:
 ```bash
 xtool                 # lista los comandos disponibles
 xtool kill-port 3000  # ejemplo de uso
+x kill-port 3000      # alias corto de xtool
 ```
+
+> El alias `x` se define en `[project.scripts]` de `pyproject.toml`. Al agregar
+> o cambiar entry points no basta con la instalación editable: hay que correr
+> `uv tool install --editable . --force` (un `uv tool upgrade` no crea los
+> symlinks de executables nuevos).
+
+## Ayuda de un comando
+
+Cada comando documenta sus argumentos y opciones en la terminal, sin abrir
+el README y desde cualquier directorio:
+
+```bash
+xtool help git-deploy   # manual completo del comando
+xtool git-deploy -h     # equivalente: -h/--help justo tras el comando
+```
+
+El manual sale del docstring del módulo del tool (`xtool/tools/<name>.py`),
+así que todo comando nuevo ya trae ayuda sin configurar nada.
 
 ## Emails
 
@@ -60,8 +80,12 @@ en `xtool/emails/.env` — ver `xtool/emails/.env.example`.
 ```bash
 git add ...            # staging de los cambios a commitear
 xtool git-diff         # analiza el diff y genera el mensaje
+xtool git-diff --commit <id>   # descripción alternativa de un commit existente
 ```
 
+- Con `--commit <id>` se analiza el diff de ese commit (`git show`, admite
+  hash, `HEAD~1`, rama, ...) en lugar del diff staged y se genera una
+  descripción alternativa de sus cambios.
 - Requiere `TOKEN_AI` en el `.env` del proyecto o en el del arsenal.
 - El commit ganador se copia al portapapeles (listo para `git commit`).
 - Si la rama actual lleva un ID numérico (`feat-123`, `issue/45`,
@@ -349,7 +373,8 @@ xtool info
 ### zsh (oh-my-zsh)
 
 `completions/_xtool` es un completion nativo de zsh con descripciones y menú
-interactivo. La lista de comandos se genera con el comando oculto
+interactivo, activo para `xtool` y su alias `x` (línea `#compdef xtool x`).
+La lista de comandos se genera con el comando oculto
 `xtool __complete` (formato `comando:descripción`), así que los tools nuevos
 de `xtool/tools/` autocompletean sin tocar nada.
 
@@ -371,6 +396,7 @@ El script `completions/xtool.bash` agrega autocompletado con TAB:
 - `xtool <TAB>` — lista los comandos disponibles (se genera dinámicamente
   parseando la salida de `xtool`, así que los tools nuevos de `xtool/tools/`
   autocompletean sin tocar el script).
+- `x <TAB>` — lo mismo, para el alias corto.
 - `xtool help <TAB>` — los mismos comandos.
 - `xtool emails <TAB>` — subcomandos (`server build watch extract`) y
   `xtool emails -<TAB>` — flags (`--port --no-install -h --help`).
@@ -388,8 +414,8 @@ la completación dinámica funcione, `xtool` debe estar instalado y en el PATH.
 
 ### Qué completa zsh
 
-- `xtool <TAB>` y `xtool help <TAB>` — comandos con su descripción (menú
-  navegable con las flechas).
+- `xtool <TAB>`, `x <TAB>` y `xtool help <TAB>` / `x help <TAB>` — comandos
+  con su descripción (menú navegable con las flechas).
 - `xtool emails <TAB>` — subcomandos (`server build watch extract dist`) y
   flags (`--port --no-install`).
 - `xtool git-cherry <TAB>` — directorios; segundo TAB hashes del repo origen.

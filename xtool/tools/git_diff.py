@@ -3,10 +3,15 @@
 
 Uso:
   xtool git-diff
+  xtool git-diff --commit <id>
 
 Requisitos:
-  - Estar en un repo git con cambios staged (git add)
+  - Estar en un repo git con cambios staged (git add), o usar --commit <id>
   - TOKEN_AI en el .env del proyecto o del arsenal
+
+Con --commit <id> se toma el diff de ese commit (git show) en lugar del diff
+staged y se genera una descripción alternativa de sus cambios. El id admite
+hash, HEAD~1, rama, etc. (todo lo que resuelva git).
 
 El diff se limita a 1M de caracteres: se excluyen lockfiles, binarios y
 generados y, si aun así supera el límite, se trunca por archivo dejando un
@@ -24,6 +29,7 @@ import queue
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from typing import Any, Dict, List, Optional, cast
@@ -369,12 +375,16 @@ def _fit_chunks(chunks, budget):
   return full, truncated, omitted
 
 
-def _compact_stats(paths):
+def _compact_stats(paths, commit_id=None):
   if not paths:
     return []
+  if commit_id:
+    cmd = ["git", "show", "--format=", "--compact-summary", commit_id, "--", ".", *ORIGINAL_EXCLUDES]
+  else:
+    cmd = ["git", "diff", "--cached", "--compact-summary", "--", ".", *ORIGINAL_EXCLUDES]
   try:
     proc = subprocess.run(
-      ["git", "diff", "--cached", "--compact-summary", "--", ".", *ORIGINAL_EXCLUDES],
+      cmd,
       capture_output=True,
       text=True,
       encoding="utf-8",
@@ -394,8 +404,8 @@ def _compact_stats(paths):
   return [stats[p] for p in paths if p in stats]
 
 
-def _build_tail(paths):
-  lines = _compact_stats([p for p in paths if p])
+def _build_tail(paths, commit_id=None):
+  lines = _compact_stats([p for p in paths if p], commit_id)
   if not lines:
     return ""
   shown = lines[:TAIL_MAX_LINES]
@@ -429,7 +439,8 @@ def _add_stage(stages, label, before, after, files_before, files_after, dropped,
   })
 
 
-def get_git_diff():
+def get_git_diff(commit_id=None):
+  """Obtiene el diff a analizar: del commit dado (git show) o del staged."""
   meta = {
     "error": None,
     "empty_reason": None,
@@ -444,7 +455,11 @@ def get_git_diff():
     "stages": [],
     "tail_chars": 0,
   }
-  cmd = ["git", "diff", "--cached", *GIT_DIFF_FLAGS, "--", ".", *ORIGINAL_EXCLUDES]
+  if commit_id:
+    # --format= suprime el mensaje original: solo interesa el diff
+    cmd = ["git", "show", "--format=", *GIT_DIFF_FLAGS, commit_id, "--", ".", *ORIGINAL_EXCLUDES]
+  else:
+    cmd = ["git", "diff", "--cached", *GIT_DIFF_FLAGS, "--", ".", *ORIGINAL_EXCLUDES]
   meta["command"] = " ".join(cmd)
   try:
     proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -460,8 +475,18 @@ def get_git_diff():
   meta["original_chars"] = len(raw)
 
   if not raw.strip():
-    check = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True, encoding="utf-8", errors="replace")
-    meta["empty_reason"] = "all_excluded" if (check.returncode == 0 and check.stdout.strip()) else "no_staged"
+    if commit_id:
+      check = subprocess.run(
+        ["git", "show", "--format=", "--name-only", commit_id],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+      )
+      meta["empty_reason"] = "all_excluded" if (check.returncode == 0 and check.stdout.strip()) else "empty_commit"
+    else:
+      check = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+      meta["empty_reason"] = "all_excluded" if (check.returncode == 0 and check.stdout.strip()) else "no_staged"
     return None, meta
 
   chunks = _split_chunks(raw)
@@ -502,7 +527,7 @@ def get_git_diff():
 
   if total > MAX_DIFF_CHARS:
     rounds.append(3)
-    pre_tail = _build_tail(meta["excluded_files"])
+    pre_tail = _build_tail(meta["excluded_files"], commit_id)
     full, truncated, omitted = _fit_chunks(keep, MAX_DIFF_CHARS - len(pre_tail) - MARKER_RESERVE)
     body = sum(len(c["text"]) for c in full) + sum(len(t["text"]) for t in truncated)
     _add_stage(
@@ -525,7 +550,7 @@ def get_git_diff():
   tail = ""
   tail_paths = list(meta["excluded_files"]) + list(meta["omitted_files"]) + [t["path"] for t in truncated]
   if tail_paths:
-    tail = _build_tail(tail_paths)
+    tail = _build_tail(tail_paths, commit_id)
 
   final = "".join([c["text"] for c in full] + [t["text"] for t in truncated]) + tail
   while len(final) > MAX_DIFF_CHARS and "\n" in tail:
@@ -690,19 +715,80 @@ def carrera_modelos(diff):
   return ganador
 
 
+def parse_args(args):
+  """Parsea argv del comando. Devuelve (opts, error); opts=None para --help."""
+  opts = {"commit": None}
+  i = 0
+  while i < len(args):
+    a = args[i]
+    if a in ("-h", "--help"):
+      return None, None
+    if a == "--commit":
+      if i + 1 >= len(args):
+        return None, "--commit requiere el ID del commit"
+      opts["commit"] = args[i + 1]
+      i += 2
+      continue
+    if a.startswith("--commit="):
+      opts["commit"] = a.split("=", 1)[1]
+      i += 1
+      continue
+    return None, f"argumento no reconocido: {a}"
+  return opts, None
+
+
+def resolver_commit(commit_id):
+  """Valida que el commit exista en este repo y devuelve '<hash> <asunto>' o None."""
+  try:
+    proc = subprocess.run(
+      ["git", "show", "-s", "--format=%h %s", commit_id],
+      capture_output=True,
+      text=True,
+      encoding="utf-8",
+      errors="replace",
+    )
+  except Exception:
+    return None
+  if proc.returncode != 0:
+    return None
+  return proc.stdout.strip() or None
+
+
+USAGE = "Uso: xtool git-diff [--commit <id>]"
+
+
 def main(argv=None):
   start_time = time.perf_counter()
 
-  diff, meta = get_git_diff()
+  opts, err = parse_args(list(sys.argv[1:] if argv is None else argv))
+  if err:
+    print(f"Error: {err}")
+    print(USAGE)
+    return 1
+  if opts is None:
+    print(__doc__.strip())
+    return 0
+  commit_id = opts["commit"]
+
+  if commit_id:
+    info = resolver_commit(commit_id)
+    if info is None:
+      print(f"Error: no se encontró el commit '{commit_id}' en este repo")
+      return 1
+    print(f"Analizando commit: {info}")
+
+  diff, meta = get_git_diff(commit_id)
 
   if diff is None:
     if meta["error"]:
       print(f"Error al obtener git diff: {meta['error']}")
     elif meta["empty_reason"] == "all_excluded":
       print("Solo hay cambios en archivos excluidos (json, lockfiles, generados). No hay nada para analizar")
+    elif meta["empty_reason"] == "empty_commit":
+      print(f"El commit '{commit_id}' no tiene cambios que analizar (¿merge o commit vacío?)")
     else:
       print("No hay cambios pendientes en git")
-    return
+    return 1
 
   n_files = meta["raw_files"]
   resumen = f"Diff: {n_files} {'archivo' if n_files == 1 else 'archivos'} · {_fmt_size(len(diff))} · {_fmt_thousands(len(diff))} caracteres"
@@ -778,6 +864,7 @@ def main(argv=None):
 
   elapsed = time.perf_counter() - start_time
   print(f"Total: {elapsed:.2f}s")
+  return 0
 
 
 if __name__ == "__main__":

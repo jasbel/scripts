@@ -33,7 +33,7 @@ def _cmd_name(name):
 
 
 def _print_usage():
-  print("Uso: xtool <comando> [args...]")
+  print("Uso: xtool <comando> [args...]   (alias: x)")
   print("      xtool help <comando>   # manual del comando")
   tools = _available_tools()
   if tools:

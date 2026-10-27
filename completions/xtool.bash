@@ -66,3 +66,4 @@ _xtool() {
 }
 
 complete -o bashdefault -o default -F _xtool xtool
+complete -o bashdefault -o default -F _xtool x

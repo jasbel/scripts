@@ -1,6 +1,6 @@
-#compdef xtool
+#compdef xtool x
 
-# Autocompletado zsh para xtool.
+# Autocompletado zsh para xtool (y su alias corto `x`).
 # Instalación (oh-my-zsh): symlink en ~/.oh-my-zsh/custom/completions/_xtool
 #   mkdir -p ~/.oh-my-zsh/custom/completions
 #   ln -sf ~/projects/script/scripts/completions/_xtool ~/.oh-my-zsh/custom/completions/_xtool
