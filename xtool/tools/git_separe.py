@@ -32,7 +32,12 @@ Flujo interactivo:
      que coexistan las ramas 'X' y 'X/algo' (y el destino vive hasta que se
      fusionan todos los slices). Tras commitear VERIFICA que el contenido
      de la ruta en el slice sea idéntico al del destino; si difiere lo
-     avoca ruidosamente.
+     avoca ruidosamente. Con --force, ANTES se borran las slices previas
+     de este destino generadas por este script (las reconoce por el
+     marcador en su commit; las ramas ajenas con nombre coincidente no se
+     tocan): las que siguen teniendo cambios se recrean y se republican
+     con --force-with-lease; las que quedaron sin cambios (todo fusionado
+     en el origen) se borran también del remote.
   5. Vuelve a la rama original y pushea las slices creadas al remote
      (default "origin", configurable como "remote" en el JSON). Con
      --no-push las deja solo locales e imprime el comando para publicarlas.
@@ -46,7 +51,9 @@ Opciones:
   --sat a=ruta       agrega/sobrescribe un satélite (repetible),
                      p.ej. --sat ltp=DDD/1_Presentation/Web/latampass
   --dry-run          solo muestra el plan, no crea nada
-  --force            recrea ramas slice existentes (las borra primero)
+  --force            re-slice: borra las slices previas de este destino
+                     (local y remote) y las recrea con el diff actual —
+                     el flujo ante cambios posteriores
   --no-push          NO publica las slices tras crearlas (default: pushea)
   -y/--yes           no pregunta (falla si no puede autodetectar el origen)
 
@@ -135,6 +142,9 @@ HINTS_ORIGEN = ("origin", "main", "master", "base")
 # Bases del repo consideradas siempre como candidatas a origen (en orden).
 BASES_ORIGEN = ("master", "main")
 REMOTO_DEFECTO = "origin"
+# Marca en el mensaje del commit de cada slice: identifica las ramas que
+# generó este script (único criterio para borrarlas en el re-slice).
+MARCADOR_SLICE = "(generado con xtool git-separe)"
 
 
 def nombre_slice(destino: str, alias: str) -> str:
@@ -158,6 +168,28 @@ def bloqueado_por_prefijo(rama: str):
     if run("git", "show-ref", "--verify", "--quiet", f"refs/heads/{prefijo}", check=False).returncode == 0:
       return prefijo
   return None
+
+
+def es_slice_generada(rama: str) -> bool:
+  """True si el commit punta de 'rama' lo generó este script (su mensaje
+  lleva el marcador). Ramas ajenas que casualmente coinciden en nombre con
+  una slice NO se consideran y por tanto no se borran ni sobreescriben."""
+  return MARCADOR_SLICE in out("git", "log", "-1", "--format=%B", rama)
+
+
+def slices_previas(destino: str, aliases):
+  """Slices previas de este destino GENERADAS POR ESTE SCRIPT (marcador en
+  el commit punta, formato actual <prefijo-id>/<alias>/<nombre>, o el
+  fallback <destino>-sat/<alias> si el destino no tiene patrón). Devuelve
+  la lista de nombres."""
+  ramas = set(ramas_locales())
+  previas = []
+  m = PATRON_PREFIJO.match(destino)
+  for alias in aliases:
+    nombre = f"{m.group(1)}/{alias}/{m.group(2)}" if m else f"{destino}-sat/{alias}"
+    if nombre in ramas and nombre not in previas and es_slice_generada(nombre):
+      previas.append(nombre)
+  return previas
 
 
 def mostrar_ruta(ruta: Path) -> str:
@@ -512,6 +544,17 @@ def _ejecutar(opts):
   else:
     print("    ✓ sin cambios fuera de satélites")
 
+  # ── Slices previas de este destino (generadas por este script) ──
+  previas = slices_previas(destino, sats)
+  if previas:
+    print(f"\n→ slices previas de este destino ({len(previas)}):")
+    for nombre in sorted(previas):
+      nota = (f"ya fusionada en '{origen}': la nueva solo llevará el delta (o nada)"
+              if es_ancestra(nombre, origen) else "")
+      print(f"    {nombre}" + (f"  ({nota})" if nota else ""))
+    if not opts["force"]:
+      print("  (sin --force no se borra ni recrea nada de lo anterior)")
+
   # ── Ramas a crear / conflictos existentes ──
   print(f"\n→ ramas a crear desde {origen}:")
   por_crear = []
@@ -523,7 +566,10 @@ def _ejecutar(opts):
       print("  (git no admite que coexistan las ramas 'X' y 'X/algo'; renómbrala o bórrala)")
       return 1
     existe = run("git", "show-ref", "--verify", "--quiet", f"refs/heads/{rama}", check=False).returncode == 0
-    existe = run("git", "show-ref", "--verify", "--quiet", f"refs/heads/{rama}", check=False).returncode == 0
+    if existe and rama not in previas:
+      print(f"    ✗ {rama} YA EXISTE y NO la generó este script: no la toco")
+      print("      (bórrala o renómbrala a mano si de verdad quieres usar ese nombre)")
+      return 1
     if existe and not opts["force"]:
       print(f"    ✗ {rama} YA EXISTE (usa --force para recrearla)")
       return 1
@@ -531,8 +577,15 @@ def _ejecutar(opts):
     print(f"    {'↻' if existe else '+'} {rama}")
 
   if opts["dry"]:
-    print("\n[dry-run] nada creado" + (f" (las slices se publicarían en '{remote}')"
-                                       if opts["push"] else " (--no-push: no se publicarán)"))
+    extra = ""
+    if previas:
+      if opts["force"]:
+        sin_reemplazo = len(previas) - len([n for n in previas if n in set(por_crear)])
+        extra = f"; --force borraría {len(previas)} slice(s) previa(s)" + (f" ({sin_reemplazo} sin reemplazo)" if sin_reemplazo else "")
+      else:
+        extra = "; sin --force no se tocarían las slices previas"
+    print("\n[dry-run] nada creado" + extra
+          + (f" (las slices se publicarían en '{remote}')" if opts["push"] else " (--no-push: no se publicarán)"))
     return 0
 
   if not opts["yes"]:
@@ -544,6 +597,12 @@ def _ejecutar(opts):
     if resp.startswith("n"):
       print("Cancelado.")
       return 1
+
+  # ── Borrado local de slices previas (--force) ──
+  if opts["force"] and previas:
+    for nombre in sorted(previas):
+      run("git", "branch", "-D", nombre)
+    print(f"\n→ {len(previas)} slice(s) previa(s) borrada(s) localmente")
 
   # ── Creación de slices (en worktree temporal aislado) ──
   wt = Path(tempfile.mkdtemp(prefix="xtool-git-separe-"))
@@ -578,7 +637,7 @@ def _ejecutar(opts):
         return 1
 
       run("git", "commit", "-q", "-m",
-          f"[{alias}] slice satélite de {destino}\n\nSolo cambios de: {ruta}\n(generado con xtool git-separe)", cwd=wt)
+          f"[{alias}] slice satélite de {destino}\n\nSolo cambios de: {ruta}\n{MARCADOR_SLICE}", cwd=wt)
       run("git", "checkout", "-q", "--detach", origen, cwd=wt)
 
       if run("git", "diff", "--quiet", rama, destino, "--", ruta, check=False).returncode == 0:
@@ -595,21 +654,58 @@ def _ejecutar(opts):
   if creadas:
     print(f"\n→ ramas creadas ({destino} sigue intacta):")
     for rama in creadas:
-      print(f"    {rama}")
+      print(f"    {'↻' if rama in previas else '+'} {rama}")
+    sin_reemplazo = sorted(n for n in previas if n not in set(creadas))
+    if sin_reemplazo:
+      print(f"    ({len(sin_reemplazo)} previa(s) borrada(s) sin reemplazo: {' '.join(sin_reemplazo)})")
 
-  if opts["push"] and creadas:
-    print(f"\n→ publicando {len(creadas)} slices en '{remote}' ...")
-    pu = run("git", "push", remote, *creadas, check=False)
-    if pu.returncode != 0:
-      print(f"✗ ERROR al pushear:\n{pu.stderr.strip()}")
+  # ── Publicación y limpieza remota ──
+  if opts["push"]:
+    recreadas = [r for r in creadas if r in previas]
+    nuevas = [r for r in creadas if r not in previas]
+    ok_push = True
+    if creadas:
+      print(f"\n→ publicando {len(creadas)} slices en '{remote}' ..."
+            + (" (--force-with-lease: sobrescribe las ya publicadas)" if recreadas else ""))
+      if recreadas:
+        pr = run("git", "push", "--force-with-lease", remote, *recreadas, check=False)
+        if pr.returncode != 0:
+          ok_push = False
+          print(f"✗ ERROR al pushear (recreadas):\n{pr.stderr.strip()}")
+      if nuevas:
+        pn = run("git", "push", remote, *nuevas, check=False)
+        if pn.returncode != 0:
+          ok_push = False
+          print(f"✗ ERROR al pushear (nuevas):\n{pn.stderr.strip()}")
+    pendientes_borrar = sorted(n for n in previas if n not in set(creadas))
+    if pendientes_borrar:
+      existe = set()
+      for linea in out("git", "ls-remote", "--heads", remote, *pendientes_borrar).splitlines():
+        partes = linea.split("\t")
+        if len(partes) == 2:
+          existe.add(partes[1])
+      a_borrar = [n for n in pendientes_borrar if f"refs/heads/{n}" in existe]
+      if a_borrar:
+        pd = run("git", "push", remote, "--delete", *a_borrar, check=False)
+        if pd.returncode == 0:
+          print(f"✓ {len(a_borrar)} slice(s) sin reemplazo borrada(s) del remote: {' '.join(a_borrar)}")
+        else:
+          print(f"⚠ no se pudieron borrar del remote: {' '.join(a_borrar)}\n{pd.stderr.strip()}")
+    if not ok_push:
       print("las slices quedaron creadas localmente; publícalas a mano:")
-      print(f"  git push {remote} " + " ".join(creadas))
+      if recreadas:
+        print(f"  git push --force-with-lease {remote} " + " ".join(recreadas))
+      if nuevas:
+        print(f"  git push {remote} " + " ".join(nuevas))
       return 1
-    print(f"✓ slices publicadas en '{remote}'")
+    if creadas:
+      print(f"✓ slices publicadas en '{remote}'")
     return 0 if ok_total else 1
 
   print(f"\nListo ({'con avisos' if not ok_total else 'todo verificado'}). Tu rama actual no se tocó. Para publicar:")
-  print(f"  git push {remote} " + " ".join(creadas))
+  if creadas:
+    cmd = "git push --force-with-lease" if any(r in previas for r in creadas) else "git push"
+    print(f"  {cmd} {remote} " + " ".join(creadas))
   return 0 if ok_total else 1
 
 

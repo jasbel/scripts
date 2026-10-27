@@ -250,7 +250,7 @@ cd ~/projects/symfony-sites/sites/solocruceros.com   # sobre la rama con TODOS l
 xtool git-separe            # interactivo: detecta repo, destino (rama actual) y origen
 xtool git-separe --repo latam   # fuerza la sección de monorepo de la config
 xtool git-separe --dry-run  # solo el plan
-xtool git-separe --force    # recrea slices existentes
+xtool git-separe --force    # re-slice: borra las previas (local y remote) y recrea con los cambios nuevos
 xtool git-separe --no-push  # crea las slices SIN publicarlas (default: pushea)
 xtool git-separe -y         # sin preguntar (falla si no autodetecta el origen)
 xtool git-separe --sat ltp=DDD/1_Presentation/Web/latampass   # satélite extra
@@ -276,6 +276,12 @@ xtool git-separe --sat ltp=DDD/1_Presentation/Web/latampass   # satélite extra
   ser `<destino>/<alias>`: git no admite que coexistan las ramas `X` y
   `X/algo`). Tras commitear **verifica** que el contenido de la ruta en el
   slice sea idéntico al del destino. Al final lista las ramas creadas.
+- ¿Cambios nuevos en destino tras dividir? `--force` es el **re-slice**:
+  borra las slices previas de ese destino en local, recrea las que tienen
+  cambios y las república con `--force-with-lease`; las que quedaron sin
+  cambios pendientes se borran también del remote. Solo toca las ramas
+  **generadas por el script** (marcador en su commit): ramas ajenas que
+  coincidan en nombre no se borran ni sobreescriben.
 - Los archivos cambiados fuera de todos los satélites se avisan (no
   entrarían en ningún slice). Por defecto **pushea** las slices creadas al
   remote de la config (default `origin`) tras crearlas; con `--no-push` las
