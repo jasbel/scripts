@@ -54,6 +54,20 @@ xtool git-deploy -h     # equivalente: -h/--help justo tras el comando
 El manual sale del docstring del módulo del tool (`xtool/tools/<name>.py`),
 así que todo comando nuevo ya trae ayuda sin configurar nada.
 
+### Atajos de los comandos `git-*`
+
+Los comandos `git-*` también se pueden llamar sin el prefijo `git-`:
+
+```bash
+xtool diff            # = xtool git-diff
+xtool cherry          # = xtool git-cherry
+xtool cherry-origin   # = xtool git-cherry-origin
+xtool deploy          # = xtool git-deploy
+xtool separe          # = xtool git-separe
+```
+
+Si existe un tool propio con el nombre corto, ese tiene prioridad sobre el atajo.
+
 ## Emails
 
 `xtool emails` maneja el proyecto de preview de emails que vive en `xtool/emails/`

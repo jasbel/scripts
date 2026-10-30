@@ -35,6 +35,7 @@ def _cmd_name(name):
 def _print_usage():
   print("Uso: xtool <comando> [args...]   (alias: x)")
   print("      xtool help <comando>   # manual del comando")
+  print("      Los comandos git-* aceptan atajo sin prefijo (xtool diff = xtool git-diff)")
   tools = _available_tools()
   if tools:
     print("\nComandos disponibles:")
@@ -51,18 +52,30 @@ def _print_manual(name):
 
 def _print_complete():
   """Emite `comando:descripción` (uno por línea) para autocompletado de shell."""
-  for t in _available_tools():
+  tools = _available_tools()
+  for t in tools:
     print(f"{_cmd_name(t)}:{_short(t)}")
+  for t in tools:
+    short = t[len("git_"):] if t.startswith("git_") else None
+    if short and short not in tools:
+      print(f"{_cmd_name(short)}:{_short(t)}")
   print("help:manual del comando (xtool help <comando>)")
+
+
+def _exists(name):
+  return bool(VALID_NAME.match(name)) and (TOOLS_DIR / f"{name}.py").exists()
 
 
 def _resolve(name_arg):
   name = name_arg.replace("-", "_")
-  if not VALID_NAME.match(name) or not (TOOLS_DIR / f"{name}.py").exists():
-    print(f"xtool: comando desconocido: {name_arg}")
-    _print_usage()
-    return None
-  return name
+  if _exists(name):
+    return name
+  # Atajo: `xtool diff` equivale a `xtool git-diff` (si no existe un tool propio con ese nombre).
+  if _exists(f"git_{name}"):
+    return f"git_{name}"
+  print(f"xtool: comando desconocido: {name_arg}")
+  _print_usage()
+  return None
 
 
 def main(argv=None):
