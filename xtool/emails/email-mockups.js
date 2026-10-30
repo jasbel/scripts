@@ -282,6 +282,135 @@ function gmailMockup(emailHtml, ctx) {
 </html>`;
 }
 
+/**
+ * Mockup de Gmail móvil (webmail en navegador móvil): vista de conversación
+ * a ancho fluido — pensado para meterse en un frame de ~390px.
+ */
+function gmailMobileMockup(emailHtml, ctx) {
+  const { senderName, senderEmail, subject, toName, toEmail, dateStr, timeStr } = ctx;
+  const initial = (senderName || '?').trim().charAt(0).toUpperCase();
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gmail · ${esc(subject)}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Google Sans', Roboto, -apple-system, Arial, sans-serif;
+    background: #fff; color: #1f1f1f;
+    display: flex; flex-direction: column; min-height: 100vh;
+  }
+  .gm-top {
+    display: flex; align-items: center; gap: 2px;
+    height: 48px; padding: 0 4px; background: #fff;
+    border-bottom: 1px solid #f1f3f4; flex: 0 0 auto;
+  }
+  .gm-ico {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: grid; place-items: center; color: #444746;
+    cursor: pointer; flex: 0 0 auto;
+  }
+  .gm-ico:hover { background: #f1f3f4; }
+  .gm-spacer { flex: 1; }
+  .gm-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #db4437, #fbbc04);
+    color: #fff; font-weight: 600; font-size: 14px;
+    display: grid; place-items: center; margin: 0 10px 0 6px; cursor: pointer;
+  }
+  .gm-subject {
+    font-size: 22px; font-weight: 400; color: #1f1f1f;
+    padding: 14px 16px 10px; line-height: 1.25;
+  }
+  .gm-head {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 4px 16px 14px; border-bottom: 1px solid #f1f3f4;
+  }
+  .gm-from-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #db4437; color: #fff; font-weight: 600; font-size: 18px;
+    display: grid; place-items: center; flex: 0 0 40px;
+  }
+  .gm-from-info { flex: 1; min-width: 0; }
+  .gm-from-name { font-size: 14px; color: #1f1f1f; font-weight: 500; }
+  .gm-to { font-size: 12px; color: #444746; margin-top: 3px; }
+  .gm-to .chev { color: #5f6368; font-size: 10px; }
+  .gm-date {
+    font-size: 12px; color: #444746; white-space: nowrap;
+    display: flex; align-items: center; gap: 2px;
+  }
+  .gm-body { flex: 1 1 auto; overflow: auto; background: #fff; }
+  .gm-bottom {
+    flex: 0 0 auto; display: flex; gap: 8px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid #f1f3f4; background: #fff;
+  }
+  .gm-bottom .btn {
+    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: 1px solid #dadce0; border-radius: 20px;
+    padding: 9px 12px; font-size: 13px; color: #1f1f1f; cursor: pointer;
+    background: #fff;
+  }
+  .gm-bottom .btn .ico { width: 16px; height: 16px; color: #444746; }
+</style>
+</head>
+<body>
+  <div class="gm-top">
+    <div class="gm-ico" title="Atrás">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </div>
+    <div class="gm-ico" title="Archivar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+    </div>
+    <div class="gm-ico" title="Eliminar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+    </div>
+    <div class="gm-ico" title="Marcar como no leído">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+    </div>
+    <div class="gm-ico" title="Más opciones">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+    </div>
+    <div class="gm-spacer"></div>
+    <div class="gm-ico" title="Buscar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+    </div>
+    <div class="gm-avatar">Y</div>
+  </div>
+
+  <div class="gm-subject">${esc(subject)}</div>
+
+  <div class="gm-head">
+    <div class="gm-from-avatar">${esc(initial)}</div>
+    <div class="gm-from-info">
+      <div class="gm-from-name">${esc(senderName)}</div>
+      <div class="gm-to">para ${esc(toName)} &lt;${esc(toEmail)}&gt; <span class="chev">▼</span></div>
+    </div>
+    <div class="gm-date">${esc(dateStr)}, ${esc(timeStr)}</div>
+  </div>
+
+  <div class="gm-body">
+    ${emailHtml}
+  </div>
+
+  <div class="gm-bottom">
+    <div class="btn">
+      <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>
+      Responder
+    </div>
+    <div class="btn">
+      <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z"/></svg>
+      Reenviar
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 function outlookMockup(emailHtml, ctx) {
   const { senderName, senderEmail, subject, toName, toEmail, dateStr, timeStr } = ctx;
   const initial = (senderName || '?').trim().charAt(0).toUpperCase();
@@ -476,6 +605,7 @@ function outlookMockup(emailHtml, ctx) {
 
 const CLIENT_MOCKUP = {
   'gmail-web': 'gmail',
+  'gmail-web-mobile': 'gmail-mobile',
   'gmail-android': 'gmail',
   'gmail-ios': 'gmail',
   'outlook-windows': 'outlook',
@@ -505,6 +635,7 @@ function wrapInMockup(client, emailHtml, ctx) {
   }
 
   if (kind === 'gmail') return gmailMockup(wrappedEmail, ctx);
+  if (kind === 'gmail-mobile') return gmailMobileMockup(wrappedEmail, ctx);
   if (kind === 'outlook') return outlookMockup(wrappedEmail, ctx);
   return emailHtml;
 }
@@ -515,6 +646,7 @@ function hasMockup(client) {
 
 export {
   gmailMockup,
+  gmailMobileMockup,
   outlookMockup,
   wrapInMockup,
   hasMockup,

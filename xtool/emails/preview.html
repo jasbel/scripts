@@ -321,6 +321,7 @@
     <div class="seg" id="clientSeg">
       <button data-client="original" class="active" title="Sin filtrar CSS">Original</button>
       <button data-client="gmail-web" title="Gmail Web">Gmail</button>
+      <button data-client="gmail-web-mobile" title="Gmail web en navegador móvil: sin &lt;style&gt;, sin @media, sin display:none — solo estilos inline">Gmail Móvil</button>
       <button data-client="outlook-windows" title="Outlook Windows">Outlook</button>
       <button data-client="apple-mail" title="Apple Mail">Apple</button>
       <button data-client="yahoo-mail" title="Yahoo Mail">Yahoo</button>
@@ -418,11 +419,22 @@
     document.getElementById('seg').addEventListener('click', (e) => {
       const btn = e.target.closest('button');
       if (!btn) return;
-      document.querySelectorAll('#seg button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      wrap.classList.toggle('mobile', btn.dataset.w === '390');
-      wrap.classList.toggle('web', btn.dataset.w === 'web');
+      setWidth(btn.dataset.w);
     });
+
+    /* Activa un ancho del segmento Desktop/Mobile/Web */
+    function setWidth(w) {
+      document.querySelectorAll('#seg button').forEach(b => b.classList.remove('active'));
+      const btn = document.querySelector('#seg button[data-w="' + w + '"]');
+      if (btn) btn.classList.add('active');
+      wrap.classList.toggle('mobile', w === '390');
+      wrap.classList.toggle('web', w === 'web');
+    }
+
+    /* El webmail móvil de Gmail se ve en viewport de teléfono */
+    function isMobileViewportClient() {
+      return currentClient === 'gmail-web-mobile';
+    }
 
     // --- Selector de cliente + mockup ---
     let currentClient = 'original';
@@ -432,7 +444,7 @@
     const mockupLabel = document.getElementById('mockupLabel');
 
     const MOCKUP_CLIENTS = new Set([
-      'gmail-web', 'gmail-android', 'gmail-ios',
+      'gmail-web', 'gmail-web-mobile', 'gmail-android', 'gmail-ios',
       'outlook-windows', 'outlook-web', 'outlook-mac',
     ]);
 
@@ -498,6 +510,9 @@
       btn.classList.add('active');
       currentClient = btn.dataset.client;
 
+      // Gmail web móvil = viewport de teléfono, con o sin mockup
+      if (isMobileViewportClient()) setWidth('390');
+
       const hasChrome = clientHasMockup(currentClient);
       if (!hasChrome && mockupEnabled) {
         mockupEnabled = false;
@@ -510,12 +525,8 @@
     mockupToggle.addEventListener('change', () => {
       mockupEnabled = mockupToggle.checked;
       if (mockupEnabled) {
-        // Forzar width web para ver el chrome completo
-        document.querySelectorAll('#seg button').forEach(b => b.classList.remove('active'));
-        const webBtn = document.querySelector('#seg button[data-w="web"]');
-        if (webBtn) webBtn.classList.add('active');
-        wrap.classList.remove('mobile');
-        wrap.classList.add('web');
+        // Forzar width web para ver el chrome completo (móvil para el webmail móvil)
+        setWidth(isMobileViewportClient() ? '390' : 'web');
       }
       reloadFrame();
     });

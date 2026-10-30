@@ -7,7 +7,7 @@
  *
  * NO usa juice: el template tiene HTML mal formado y lo corrompe.
  *
- * Clientes: gmail-web, gmail-android, gmail-ios,
+ * Clientes: gmail-web, gmail-web-mobile, gmail-android, gmail-ios,
  *           outlook-windows, outlook-web, outlook-mac,
  *           apple-mail, yahoo-mail, original
  */
@@ -33,6 +33,28 @@ const UNSUPPORTED_PROPERTIES = {
     'grid', 'grid-template', 'grid-template-columns', 'grid-template-rows',
     'grid-gap', 'grid-column', 'grid-row', 'place-items', 'place-content',
     'min-width', 'min-height',
+  ],
+  // Gmail webmail móvil (gmail.com en navegador móvil) — caniemail:
+  // NO soporta el elemento <style> (ver STRIP_STYLE_ELEMENTS), ni @media,
+  // ni display:none (ver REMOVED_DISPLAY_VALUES). Solo sobreviven estilos
+  // inline, y de estos se eliminan las propiedades siguientes.
+  // OJO: display:flex/grid, float, max-width/min-* SÍ funcionan aquí
+  // (a diferencia del gmail-web desktop de arriba).
+  'gmail-web-mobile': [
+    'position', 'z-index', 'left', 'right', 'top', 'bottom', 'inset',
+    'opacity', 'visibility', 'box-sizing', 'box-shadow', 'text-shadow',
+    'filter', 'backdrop-filter', 'transform', 'transition', 'animation',
+    'background-size', 'background-clip', 'background-origin',
+    'background-blend-mode', 'mix-blend-mode', 'border-image',
+    'object-fit', 'object-position', 'cursor', 'aspect-ratio', 'column-count',
+    'gap', 'row-gap', 'column-gap',
+    'flex', 'flex-direction', 'flex-wrap', 'flex-flow',
+    'flex-grow', 'flex-shrink', 'flex-basis',
+    'justify-content', 'align-items', 'align-content', 'align-self', 'order',
+    'grid', 'grid-template', 'grid-template-columns', 'grid-template-rows',
+    'grid-gap', 'grid-column', 'grid-row', 'place-items', 'place-content',
+    'list-style-image', 'mask-image', 'clip-path', 'outline-offset',
+    'text-decoration-color', 'text-wrap',
   ],
   'gmail-android': [
     'position', 'z-index', 'float',
@@ -128,6 +150,8 @@ const DISPLAY_REWRITE = {
     flex: 'block', 'inline-flex': 'inline-block',
     grid: 'block', 'inline-grid': 'inline-block', contents: 'block',
   },
+  // Gmail webmail móvil: flex/grid SÍ están soportados → no se reescriben
+  'gmail-web-mobile': {},
   'outlook-windows': {
     flex: 'block',
     'inline-flex': 'inline-block',
@@ -152,6 +176,16 @@ const DISPLAY_REWRITE = {
   'original': {},
 };
 
+/**
+ * Valores de `display` que el cliente ELIMINA por completo (la declaración
+ * desaparece y el elemento vuelve al display por defecto del tag → se ve).
+ * Gmail webmail móvil elimina `display:none` incluso inline: los elementos
+ * penseados para estar ocultos (preheaders, variantes desktop/móvil) SE VEN.
+ */
+const REMOVED_DISPLAY_VALUES = {
+  'gmail-web-mobile': ['none'],
+};
+
 const UNSUPPORTED_SELECTORS = {
   'gmail-web': [
     ':hover', ':active', ':focus', ':visited', ':focus-within',
@@ -160,6 +194,13 @@ const UNSUPPORTED_SELECTORS = {
   ],
   'gmail-android': [':hover', ':before', ':after', '::before', '::after'],
   'gmail-ios': [':hover', ':before', ':after', '::before', '::after'],
+  // gmail-web-mobile: irrelevante en la práctica (los <style> se eliminan
+  // enteros), pero queda por defensividad si algún bloque sobrevive
+  'gmail-web-mobile': [
+    ':hover', ':active', ':focus', ':visited', ':focus-within',
+    ':before', ':after', '::before', '::after',
+    '::placeholder', ':nth-child', ':nth-of-type', ':not(',
+  ],
   'outlook-windows': [
     ':hover', ':active', ':focus', ':visited',
     ':before', ':after', '::before', '::after',
@@ -249,7 +290,19 @@ const ENGINE_CSS = {
 .email-body-wrapper [style*="display: grid"],
 .email-body-wrapper [style*="display:grid"] { display: block !important; }
 `,
+  // gmail-web-mobile: el HTML ya se reescribe de verdad (style blocks fuera,
+  // display:none fuera, propiedades inline fuera) → no hace falta CSS motor
+  'gmail-web-mobile': '',
   'original': '',
+};
+
+/**
+ * Clientes que NO soportan el elemento <style> en absoluto:
+ * los bloques se eliminan enteros (head y body), igual que hace Gmail
+ * webmail móvil. Las reglas de clase/id/media desaparecen con ellos.
+ */
+const STRIP_STYLE_ELEMENTS = {
+  'gmail-web-mobile': true,
 };
 
 // ============================================================================
@@ -351,6 +404,10 @@ function rewriteDeclaration({ property, value }, client) {
   // Prefijos flex-/grid- ya cubiertos arriba; display se reescribe
   if (prop === 'display') {
     const displayValue = value.toLowerCase().split(/\s+/)[0];
+    // Valores eliminados por el cliente (display:none en gmail-web-mobile):
+    // la declaración desaparece → el elemento se muestra con su display por defecto
+    const removed = (REMOVED_DISPLAY_VALUES[client] || []).includes(displayValue);
+    if (removed) return null;
     const rewrites = DISPLAY_REWRITE[client] || {};
     if (rewrites[displayValue]) {
       return { property, value: rewrites[displayValue] };
@@ -511,8 +568,14 @@ function filterForClient(html, client = 'original') {
   const styles = extractStyles(filteredHtml);
   for (let i = styles.blocks.length - 1; i >= 0; i--) {
     const block = styles.blocks[i];
-    const filteredCss = filterCssBlock(block.content, client);
-    const replacement = filteredCss ? `<style>${filteredCss}</style>` : '';
+    let replacement;
+    if (STRIP_STYLE_ELEMENTS[client]) {
+      // gmail-web-mobile: el elemento <style> no existe → bloque entero fuera
+      replacement = '';
+    } else {
+      const filteredCss = filterCssBlock(block.content, client);
+      replacement = filteredCss ? `<style>${filteredCss}</style>` : '';
+    }
     filteredHtml =
       filteredHtml.slice(0, block.start) +
       replacement +
@@ -565,5 +628,7 @@ export {
   UNSUPPORTED_PROPERTIES,
   UNSUPPORTED_SELECTORS,
   DISPLAY_REWRITE,
+  REMOVED_DISPLAY_VALUES,
   ENGINE_CSS,
+  STRIP_STYLE_ELEMENTS,
 };
