@@ -88,15 +88,18 @@ en `xtool/emails/.env` — ver `xtool/emails/.env.example`.
 ## git-diff
 
 `xtool git-diff` genera un mensaje de commit Conventional Commits en español
-(voz pasiva, con bullets y alcance) a partir del diff staged, usando IA
+(voz pasiva y con bullets) a partir del diff staged, usando IA
 (zai-sdk, modelo `glm-5.3-flash`).
 
 ```bash
 git add ...            # staging de los cambios a commitear
 xtool git-diff         # analiza el diff y genera el mensaje
 xtool git-diff --commit <id>   # descripción alternativa de un commit existente
+xtool git-diff --with-types    # cada bullet añade su alcance: (gui), (api), ...
 ```
 
+- Por defecto los bullets terminan solo con punto; con `--with-types` cada
+  bullet añade su alcance entre paréntesis, p. ej. `(gui)`, `(api)`.
 - Con `--commit <id>` se analiza el diff de ese commit (`git show`, admite
   hash, `HEAD~1`, rama, ...) en lugar del diff staged y se genera una
   descripción alternativa de sus cambios.

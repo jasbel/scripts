@@ -4,6 +4,7 @@
 Uso:
   xtool git-diff
   xtool git-diff --commit <id>
+  xtool git-diff --with-types
 
 Requisitos:
   - Estar en un repo git con cambios staged (git add), o usar --commit <id>
@@ -19,6 +20,9 @@ resumen de lo omitido.
 
 Si la rama actual lleva un ID numérico (feat-123, issue/45, hotfix-789, ...)
 se antepone [123] al commit generado.
+
+Por defecto los bullets terminan solo con punto; con --with-types cada bullet
+añade su alcance entre paréntesis, p. ej. (gui), (api).
 
 El commit ganador se copia al portapapeles.
 """
@@ -89,9 +93,9 @@ PRICING_USD_PER_1M = {
 }
 
 VALID_TYPES = ["feat", "fix", "refactor", "style", "docs", "test", "chore", "perf", "ci", "build"]
-VALID_SCOPES = ["template", "css", "api", "common", "db", "auth", "core", "test", "utils", "models", "scripts", "ci"]
+VALID_SCOPES = ["template", "css", "gui", "api", "common", "db", "auth", "core", "test", "utils", "models", "scripts", "ci"]
 
-SYSTEM_PROMPT = """
+SYSTEM_PROMPT_TMPL = """
 Genera un mensaje de commit Conventional Commits en español.
 
 Responde únicamente con el commit, sin explicaciones ni bloques de código.
@@ -100,19 +104,26 @@ Formato:
 
 [tipo]: <Título>.
 
-* <Descripción>. (<alcance>)
+* <Descripción>{suf_scope}
 
 ---
 
 Reglas:
 - Tipos: feat|fix|refactor|style|docs|test|chore|perf|ci|build
 - Título: español, inicia con mayúscula, voz pasiva ("Se + pretérito"), máximo 150 caracteres y termina con punto.
-- Descripciones: una o más líneas con "* ", voz pasiva ("Se + pretérito"), terminan con ". (<alcance>)".
-- Alcances: gui|api|common|db|auth|core|test
+- Descripciones: una o más líneas con "* ", voz pasiva ("Se + pretérito"){regla_scope}
 - Deja una línea en blanco entre el título y las descripciones.
 - No inventes cambios; resume solo los detectados.
 - Ignora cambios de archivos .json, .yml .gitignore.
 """
+
+
+def build_system_prompt(with_types=False):
+  """Prompt del sistema; con with_types cada bullet termina con su alcance (gui, api...)."""
+  return SYSTEM_PROMPT_TMPL.format(
+    suf_scope=". (<alcance>)" if with_types else ".",
+    regla_scope=', terminan con ". (<alcance>)".\n- Alcances: gui|api|common|db|auth|core|test' if with_types else ", terminan con punto",
+  )
 
 # Nivel de razonamiento del modelo: low | high | max (la API usa max por defecto)
 MODEL_VARIANT = "low"
@@ -601,7 +612,7 @@ def add_issue_prefix(commit, issue_id):
   return f"{tag} {commit}"
 
 
-def score_quality(output):
+def score_quality(output, with_types=False):
   checks = []
   text = output.strip()
   if not text:
@@ -621,7 +632,10 @@ def score_quality(output):
   checks.append({"name": "≤ 7 bullets", "pass": len(bullets) <= 7})
 
   scope_regex = re.compile(rf"\(({'|'.join(VALID_SCOPES)})\)\s*$")
-  checks.append({"name": "bullets con alcance válido", "pass": len(bullets) > 0 and all(scope_regex.search(b) for b in bullets)})
+  if with_types:
+    checks.append({"name": "bullets con alcance válido", "pass": len(bullets) > 0 and all(scope_regex.search(b) for b in bullets)})
+  else:
+    checks.append({"name": "bullets sin alcance", "pass": len(bullets) > 0 and all(not scope_regex.search(b) for b in bullets)})
   voz_regex = re.compile(r"\b(?:Se|Fue|Fueron)\s+\w", re.I)
   checks.append({"name": "bullets en voz pasiva", "pass": len(bullets) > 0 and all(voz_regex.search(b) for b in bullets)})
 
@@ -634,7 +648,7 @@ def score_quality(output):
   return passed / len(checks), checks
 
 
-def analizer_changes(diff, model):
+def analizer_changes(diff, model, system_prompt):
   t_start = time.perf_counter()
   t_first_token = None
   prompt_tokens = 0
@@ -645,7 +659,7 @@ def analizer_changes(diff, model):
     stream = client.chat.completions.create(
       model=model,
       messages=[
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": f"Analiza y Crea el git commit siguiendo **Conventional Commits**:\n\n{diff}"},
       ],
       stream=True,
@@ -694,14 +708,14 @@ def analizer_changes(diff, model):
       "error": msg,
     }
 
-def carrera_modelos(diff):
+def carrera_modelos(diff, system_prompt):
   """Lanza todos los MODELS en paralelo y devuelve el primer resultado con salida válida."""
   if len(MODELS) == 1:
-    return analizer_changes(diff, MODELS[0])
+    return analizer_changes(diff, MODELS[0], system_prompt)
   cola = queue.Queue()
 
   def _worker(model):
-    cola.put(analizer_changes(diff, model))
+    cola.put(analizer_changes(diff, model, system_prompt))
 
   hilos = [threading.Thread(target=_worker, args=(m,), daemon=True) for m in MODELS]
   for h in hilos:
@@ -717,12 +731,16 @@ def carrera_modelos(diff):
 
 def parse_args(args):
   """Parsea argv del comando. Devuelve (opts, error); opts=None para --help."""
-  opts = {"commit": None}
+  opts = {"commit": None, "with_types": False}
   i = 0
   while i < len(args):
     a = args[i]
     if a in ("-h", "--help"):
       return None, None
+    if a == "--with-types":
+      opts["with_types"] = True
+      i += 1
+      continue
     if a == "--commit":
       if i + 1 >= len(args):
         return None, "--commit requiere el ID del commit"
@@ -754,7 +772,7 @@ def resolver_commit(commit_id):
   return proc.stdout.strip() or None
 
 
-USAGE = "Uso: xtool git-diff [--commit <id>]"
+USAGE = "Uso: xtool git-diff [--commit <id>] [--with-types]"
 
 
 def main(argv=None):
@@ -769,6 +787,8 @@ def main(argv=None):
     print(__doc__.strip())
     return 0
   commit_id = opts["commit"]
+  with_types = opts["with_types"]
+  system_prompt = build_system_prompt(with_types)
 
   if commit_id:
     info = resolver_commit(commit_id)
@@ -804,7 +824,7 @@ def main(argv=None):
   if issue_id:
     print(f"Rama con ID detectado: [{issue_id}] se antepondrá al commit")
 
-  ganador = carrera_modelos(diff)
+  ganador = carrera_modelos(diff, system_prompt)
   results = [ganador] if ganador else []
 
   # print("\n\n========== RESUMEN COMPARATIVO ==========")
@@ -815,7 +835,7 @@ def main(argv=None):
       continue
     price = PRICING_USD_PER_1M.get(r["model"], {"input": 0, "output": 0})
     cost = (r["prompt_tokens"] * price["input"] + r["completion_tokens"] * price["output"]) / 1_000_000
-    quality, checks = score_quality(r["output"])
+    quality, checks = score_quality(r["output"], with_types)
     scored.append({**r, "cost": cost, "quality": quality, "checks": checks})
 
   # header = "Modelo".ljust(16) + " | " + "1er token".rjust(9) + " | " + "Total".rjust(8) + " | " + "Tokens i/o".rjust(14) + " | " + "Costo".rjust(8) + " | " + "Calidad".rjust(7) + " | " + "Score".rjust(6)
