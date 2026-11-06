@@ -96,6 +96,7 @@ git add ...            # staging de los cambios a commitear
 xtool git-diff         # analiza el diff y genera el mensaje
 xtool git-diff --commit <id>   # descripción alternativa de un commit existente
 xtool git-diff --with-types    # cada bullet añade su alcance: (gui), (api), ...
+xtool git-diff --commit-push   # genera el mensaje, commitea el staged y pushea
 ```
 
 - Por defecto los bullets terminan solo con punto; con `--with-types` cada
@@ -103,8 +104,12 @@ xtool git-diff --with-types    # cada bullet añade su alcance: (gui), (api), ..
 - Con `--commit <id>` se analiza el diff de ese commit (`git show`, admite
   hash, `HEAD~1`, rama, ...) en lugar del diff staged y se genera una
   descripción alternativa de sus cambios.
+- Con `--commit-push` el mensaje generado se usa directamente: commitea el
+  diff staged y pushea (a su upstream, o `git push -u origin <rama>` si la
+  rama aún no lo tiene). Incompatible con `--commit <id>`.
 - Requiere `TOKEN_AI` en el `.env` del proyecto o en el del arsenal.
-- El commit ganador se copia al portapapeles (listo para `git commit`).
+- El commit ganador se copia al portapapeles (listo para `git commit`);
+  con `--commit-push` no se copia: el commit ya lo hace el propio comando.
 - Si la rama actual lleva un ID numérico (`feat-123`, `issue/45`,
   `hotfix-789`, ...), se antepone `[123]` al commit generado.
 - El diff se limita a 1M de caracteres: se excluyen lockfiles, binarios y

@@ -5,6 +5,7 @@ Uso:
   xtool git-diff
   xtool git-diff --commit <id>
   xtool git-diff --with-types
+  xtool git-diff --commit-push
 
 Requisitos:
   - Estar en un repo git con cambios staged (git add), o usar --commit <id>
@@ -24,7 +25,13 @@ se antepone [123] al commit generado.
 Por defecto los bullets terminan solo con punto; con --with-types cada bullet
 añade su alcance entre paréntesis, p. ej. (gui), (api).
 
-El commit ganador se copia al portapapeles.
+Con --commit-push, además de generar el mensaje se commitea el diff staged
+con él y se pushea: a su upstream si la rama ya lo tiene, o con
+'git push -u origin <rama>' si es el primer push. Incompatible con
+--commit <id> (ahí no hay staged que commitear).
+
+El commit ganador se copia al portapapeles (solo sin --commit-push, cuando
+aún hay que commitear a mano).
 """
 
 import os
@@ -34,6 +41,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from typing import Any, Dict, List, Optional, cast
@@ -731,7 +739,7 @@ def carrera_modelos(diff, system_prompt):
 
 def parse_args(args):
   """Parsea argv del comando. Devuelve (opts, error); opts=None para --help."""
-  opts = {"commit": None, "with_types": False}
+  opts = {"commit": None, "with_types": False, "commit_push": False}
   i = 0
   while i < len(args):
     a = args[i]
@@ -739,6 +747,10 @@ def parse_args(args):
       return None, None
     if a == "--with-types":
       opts["with_types"] = True
+      i += 1
+      continue
+    if a == "--commit-push":
+      opts["commit_push"] = True
       i += 1
       continue
     if a == "--commit":
@@ -752,6 +764,8 @@ def parse_args(args):
       i += 1
       continue
     return None, f"argumento no reconocido: {a}"
+  if opts["commit_push"] and opts["commit"]:
+    return None, "--commit-push commitea el diff staged; es incompatible con --commit <id>"
   return opts, None
 
 
@@ -772,7 +786,106 @@ def resolver_commit(commit_id):
   return proc.stdout.strip() or None
 
 
-USAGE = "Uso: xtool git-diff [--commit <id>] [--with-types]"
+USAGE = "Uso: xtool git-diff [--commit <id>] [--with-types] [--commit-push]"
+
+
+def hacer_commit(mensaje):
+  """Commitea el diff staged con el mensaje generado (git commit -F).
+
+  Devuelve el oneline del commit creado o None si falló.
+  """
+  fd, ruta = tempfile.mkstemp(prefix="xtool_commit_", suffix=".msg")
+  try:
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+      f.write(mensaje + "\n")
+    proc = subprocess.run(
+      ["git", "commit", "-F", ruta],
+      capture_output=True,
+      text=True,
+      encoding="utf-8",
+      errors="replace",
+    )
+  finally:
+    os.unlink(ruta)
+  if proc.returncode != 0:
+    print("Error: no se pudo commitear:")
+    print((proc.stderr.strip() or proc.stdout.strip())[:1000])
+    return None
+  log = subprocess.run(
+    ["git", "log", "-1", "--oneline"],
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+    errors="replace",
+  )
+  oneline = log.stdout.strip()
+  print(f"Commit creado: {oneline}")
+  return oneline or True
+
+
+def rama_actual():
+  """Devuelve la rama activa o None (HEAD detached o error de git)."""
+  try:
+    proc = subprocess.run(
+      ["git", "branch", "--show-current"],
+      capture_output=True,
+      text=True,
+      encoding="utf-8",
+      errors="replace",
+      timeout=10,
+    )
+  except Exception:
+    return None
+  return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def upstream_actual():
+  """Devuelve el upstream de la rama activa ('origin/main') o None si no tiene."""
+  try:
+    proc = subprocess.run(
+      ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+      capture_output=True,
+      text=True,
+      encoding="utf-8",
+      errors="replace",
+      timeout=10,
+    )
+  except Exception:
+    return None
+  return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def hacer_push():
+  """Pushea la rama activa: a su upstream, o -u origin en el primer push.
+
+  Devuelve True si el push terminó bien.
+  """
+  rama = rama_actual()
+  if not rama:
+    print("Error: no se pudo determinar la rama activa (¿HEAD detached?); no se pushea")
+    return False
+  upstream = upstream_actual()
+  if upstream:
+    print(f"Push: git push ({upstream})")
+    cmd = ["git", "push"]
+  else:
+    print(f"Push: git push -u origin {rama} (la rama no tiene upstream)")
+    cmd = ["git", "push", "-u", "origin", rama]
+  proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+  if proc.returncode != 0:
+    print("Error: no se pudo pushear:")
+    print((proc.stderr.strip() or proc.stdout.strip())[:1000])
+    print("    El commit ya está creado localmente; resuelve y reintenta el push")
+    return False
+  print(f"Pusheado a {upstream or f'origin/{rama}'}")
+  return True
+
+
+def commit_y_push(mensaje):
+  """Commitea el staged con el mensaje generado y pushea. True si todo fue bien."""
+  if hacer_commit(mensaje) is None:
+    return False
+  return hacer_push()
 
 
 def main(argv=None):
@@ -788,6 +901,7 @@ def main(argv=None):
     return 0
   commit_id = opts["commit"]
   with_types = opts["with_types"]
+  commit_push = opts["commit_push"]
   system_prompt = build_system_prompt(with_types)
 
   if commit_id:
@@ -875,16 +989,21 @@ def main(argv=None):
 
   if not scored:
     print("Error: ningún modelo generó commit")
+    return_code = 1
   else:
     best = scored[0]
     commit, summary = parse_response(best["output"])
     commit = add_issue_prefix(commit, issue_id)
     print(f"\n{commit}\n")
-    copy_to_clipboard(commit)
+    if commit_push:
+      return_code = 0 if commit_y_push(commit) else 1
+    else:
+      copy_to_clipboard(commit)
+      return_code = 0
 
   elapsed = time.perf_counter() - start_time
   print(f"Total: {elapsed:.2f}s")
-  return 0
+  return return_code
 
 
 if __name__ == "__main__":
