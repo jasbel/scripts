@@ -240,6 +240,7 @@
   "currentYear": "2026",
 
   "agent": true,
+  "originWeb": true,
   "photo": "https://apisandbox.solocruceros.com/media/user/30/photo?date=20220427113548",
   "scSquareImg": "https://apisandbox.solocruceros.com/uploads/email/2020/sc_square_img.png",
   "name": "Miriam Vallverdú",

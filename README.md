@@ -105,8 +105,12 @@ xtool git-diff --commit-push   # genera el mensaje, commitea el staged y pushea
   hash, `HEAD~1`, rama, ...) en lugar del diff staged y se genera una
   descripción alternativa de sus cambios.
 - Con `--commit-push` el mensaje generado se usa directamente: commitea el
-  diff staged y pushea (a su upstream, o `git push -u origin <rama>` si la
-  rama aún no lo tiene). Incompatible con `--commit <id>`.
+  diff staged, hace `git pull --no-rebase --no-edit` para integrar el
+  trabajo remoto y, si el merge sale limpio, pushea (a su upstream, o
+  `git push -u origin <rama>` si la rama aún no lo tiene). El pull va tras
+  el commit porque git se niega a mergear con cambios staged. Solo si el
+  pull termina en conflicto NO se pushea: el commit queda en local y el
+  conflicto se resuelve a mano. Incompatible con `--commit <id>`.
 - Requiere `TOKEN_AI` en el `.env` del proyecto o en el del arsenal.
 - El commit ganador se copia al portapapeles (listo para `git commit`);
   con `--commit-push` no se copia: el commit ya lo hace el propio comando.

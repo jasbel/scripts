@@ -27,8 +27,13 @@ añade su alcance entre paréntesis, p. ej. (gui), (api).
 
 Con --commit-push, además de generar el mensaje se commitea el diff staged
 con él y se pushea: a su upstream si la rama ya lo tiene, o con
-'git push -u origin <rama>' si es el primer push. Incompatible con
---commit <id> (ahí no hay staged que commitear).
+'git push -u origin <rama>' si es el primer push. Entre el commit y el
+push se hace 'git pull --no-rebase --no-edit' para incorporar el trabajo
+remoto y no pisar el de los compañeros (el pull va tras el commit porque
+git se niega a mergear con cambios staged): si el merge sale limpio se
+pushea, y solo si termina en conflicto NO se pushea — el commit queda en
+local y el conflicto se resuelve a mano. Incompatible con --commit <id>
+(ahí no hay staged que commitear).
 
 El commit ganador se copia al portapapeles (solo sin --commit-push, cuando
 aún hay que commitear a mano).
@@ -881,9 +886,56 @@ def hacer_push():
   return True
 
 
+def hacer_pull():
+  """Hace 'git pull --no-rebase --no-edit' tras commitear, antes del push.
+
+  Va DESPUÉS del commit (índice limpio): git se niega a mergear si hay
+  cambios staged, así que es el único punto donde el merge puede correr de
+  verdad. Con --no-rebase se fuerza merge (no rebase) y con --no-edit el
+  merge commit se crea sin abrir editor. El merge o auto-resuelve limpio o
+  termina en conflicto; nunca pisa silenciosamente el trabajo remoto.
+
+  Devuelve True si se puede pushear (pull ok, ya actualizado, o rama sin
+  upstream); False si falló (conflicto de merge, error de red, ...).
+  """
+  upstream = upstream_actual()
+  if not upstream:
+    print("Pull: omitido (la rama no tiene upstream, no hay nada que actualizar)")
+    return True
+  print(f"Pull: git pull --no-rebase --no-edit ({upstream})")
+  proc = subprocess.run(
+    ["git", "pull", "--no-rebase", "--no-edit"],
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+    errors="replace",
+  )
+  if proc.returncode != 0:
+    print("Error: el pull falló, no se pushea:")
+    # stderr trae el fetch; el detalle del conflicto (CONFLICT ...) va en stdout
+    for parte in (proc.stderr.strip(), proc.stdout.strip()):
+      if parte:
+        print(parte[:1000])
+    return False
+  claves = [li.strip() for li in proc.stdout.splitlines() if re.search(r"Already up to date|Fast-forward|Merge made by", li)]
+  print(f"Pull: {claves[0]}" if claves else "Pull: actualizado")
+  return True
+
+
 def commit_y_push(mensaje):
-  """Commitea el staged con el mensaje generado y pushea. True si todo fue bien."""
+  """Commitea el staged con el mensaje generado, integra el remoto y pushea.
+
+  Orden: commit → 'git pull --no-rebase' → push. El pull va tras el commit
+  porque git se niega a mergear con cambios staged; si el merge sale limpio
+  (fast-forward o merge commit) se pushea, y solo si termina en conflicto
+  NO se pushea: el commit queda a salvo en local y se resuelve a mano.
+  True si todo fue bien.
+  """
   if hacer_commit(mensaje) is None:
+    return False
+  if not hacer_pull():
+    print("No se pushea. El commit quedó a salvo en local; tras resolver el conflicto:")
+    print("  git add <archivos> && git commit && git push   (o 'git merge --abort' para descartar el merge)")
     return False
   return hacer_push()
 
