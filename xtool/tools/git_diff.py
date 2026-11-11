@@ -106,7 +106,7 @@ PRICING_USD_PER_1M = {
 }
 
 VALID_TYPES = ["feat", "fix", "refactor", "style", "docs", "test", "chore", "perf", "ci", "build"]
-VALID_SCOPES = ["template", "css", "gui", "api", "common", "db", "auth", "core", "test", "utils", "models", "scripts", "ci"]
+VALID_SCOPES = ["template", "css", "gui", "web", "api", "common", "db", "auth", "core", "test", "utils", "models", "scripts", "ci"]
 
 SYSTEM_PROMPT_TMPL = """
 Genera un mensaje de commit Conventional Commits en español.
