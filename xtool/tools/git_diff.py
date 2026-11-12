@@ -6,6 +6,7 @@ Uso:
   xtool git-diff --commit <id>
   xtool git-diff --with-types
   xtool git-diff --commit-push
+  xtool git-diff -y            # forma corta de --commit-push
 
 Requisitos:
   - Estar en un repo git con cambios staged (git add), o usar --commit <id>
@@ -25,7 +26,8 @@ se antepone [123] al commit generado.
 Por defecto los bullets terminan solo con punto; con --with-types cada bullet
 añade su alcance entre paréntesis, p. ej. (gui), (api).
 
-Con --commit-push, además de generar el mensaje se commitea el diff staged
+Con --commit-push (o su forma corta -y), además de generar el mensaje se
+commitea el diff staged
 con él y se pushea: a su upstream si la rama ya lo tiene, o con
 'git push -u origin <rama>' si es el primer push. Entre el commit y el
 push se hace 'git pull --no-rebase --no-edit' para incorporar el trabajo
@@ -754,7 +756,7 @@ def parse_args(args):
       opts["with_types"] = True
       i += 1
       continue
-    if a == "--commit-push":
+    if a in ("--commit-push", "-y"):
       opts["commit_push"] = True
       i += 1
       continue
@@ -791,7 +793,7 @@ def resolver_commit(commit_id):
   return proc.stdout.strip() or None
 
 
-USAGE = "Uso: xtool git-diff [--commit <id>] [--with-types] [--commit-push]"
+USAGE = "Uso: xtool git-diff [--commit <id>] [--with-types] [--commit-push | -y]"
 
 
 def hacer_commit(mensaje):

@@ -121,6 +121,7 @@ xtool git-diff         # analiza el diff y genera el mensaje
 xtool git-diff --commit <id>   # descripción alternativa de un commit existente
 xtool git-diff --with-types    # cada bullet añade su alcance: (gui), (api), ...
 xtool git-diff --commit-push   # genera el mensaje, commitea el staged y pushea
+xtool git-diff -y              # forma corta de --commit-push
 ```
 
 - Por defecto los bullets terminan solo con punto; con `--with-types` cada
@@ -128,7 +129,8 @@ xtool git-diff --commit-push   # genera el mensaje, commitea el staged y pushea
 - Con `--commit <id>` se analiza el diff de ese commit (`git show`, admite
   hash, `HEAD~1`, rama, ...) en lugar del diff staged y se genera una
   descripción alternativa de sus cambios.
-- Con `--commit-push` el mensaje generado se usa directamente: commitea el
+- Con `--commit-push` (o su forma corta `-y`) el mensaje generado se usa
+  directamente: commitea el
   diff staged, hace `git pull --no-rebase --no-edit` para integrar el
   trabajo remoto y, si el merge sale limpio, pushea (a su upstream, o
   `git push -u origin <rama>` si la rama aún no lo tiene). El pull va tras
