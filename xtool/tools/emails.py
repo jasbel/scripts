@@ -23,6 +23,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from xtool.common.utils_command import npm_argv
+
 EMAILS_DIR = Path(__file__).resolve().parents[1] / "emails"
 
 COMMANDS = {
@@ -40,11 +42,12 @@ def _ensure_deps(install):
   if not install:
     print("Faltan dependencias: node_modules no existe (quita --no-install o corre npm install)")
     return False
-  if not shutil.which("npm"):
+  npm = npm_argv(["install"])
+  if npm is None:
     print("npm no está disponible en el PATH; instala Node.js primero")
     return False
   print("[deps] node_modules no existe, ejecutando npm install ...")
-  code = subprocess.call(["npm", "install"], cwd=EMAILS_DIR)
+  code = subprocess.call(npm, cwd=EMAILS_DIR)
   if code != 0:
     print(f"npm install falló con código {code}")
     return False

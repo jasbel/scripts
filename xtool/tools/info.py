@@ -6,11 +6,14 @@ Uso:
 Qué muestra:
   - Ruta del proyecto (este arsenal), versión, rama git y remotos (GitHub).
   - Qué ejecutable xtool está en uso (venv local o instalación global de uv).
-  - Si ~/.local/bin está en el PATH y cómo agregarlo si falta.
+  - Si los ejecutables (xtool y su alias x) están en el PATH.
+  - Si ~/.local/bin falta en el PATH, cómo agregarlo según el OS
+    (macOS/Linux/Windows).
   - Entorno: Python, .env y cantidad de comandos disponibles.
 """
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -86,6 +89,22 @@ def _url_web(url: str) -> str | None:
   return None
 
 
+def _hint_path() -> list[str]:
+  """Pasos para agregar ~/.local/bin al PATH según el OS."""
+  if platform.system() == "Windows":
+    return [
+      r'      setx PATH "%PATH%;%USERPROFILE%\.local\bin"',
+      "      (luego abre una terminal nueva para que aplique)",
+    ]
+  if platform.system() == "Darwin":
+    return [
+      '      echo \'export PATH="$HOME/.local/bin:$PATH"\' >> ~/.zshrc && source ~/.zshrc',
+    ]
+  return [
+    '      echo \'export PATH="$HOME/.local/bin:$PATH"\' >> ~/.bashrc && source ~/.bashrc',
+  ]
+
+
 def main(argv=None):
   argv = sys.argv[1:] if argv is None else list(argv)
 
@@ -96,7 +115,6 @@ def main(argv=None):
   exe_crudo = Path(sys.argv[0]) if sys.argv[0] else None
   exe = exe_crudo.expanduser().absolute() if exe_crudo else None
   tipo = _clasificar(exe) if exe else "?"
-  which = shutil.which("xtool")
   tools_dir = PROJECT_ROOT / "xtool" / "tools"
   n_tools = len([p for p in tools_dir.glob("*.py") if p.name != "__init__.py"])
 
@@ -121,15 +139,20 @@ def main(argv=None):
     print(f"  Origen:     {tipo}")
     if tipo.startswith("instalación global"):
       print("  Actualizar: uv tool upgrade scripts  (tras cambiar dependencias)")
-  if which:
-    print(f"  En el PATH: {which}")
+  for name in ("xtool", "x"):
+    p = shutil.which(name)
+    if p:
+      print(f"  En el PATH: {name} = {p}")
+    elif name == "x":
+      print("  En el PATH: x falta  →  corre: xtool update")
   print()
   print("PATH:")
   if _global_bin_en_path():
     print(f"  ✓ {GLOBAL_BIN} está en el PATH → xtool disponible en cualquier terminal")
   else:
     print(f"  ✗ {GLOBAL_BIN} NO está en el PATH. Para agregarlo:")
-    print('      echo \'export PATH="$HOME/.local/bin:$PATH"\' >> ~/.bashrc && source ~/.bashrc')
+    for linea in _hint_path():
+      print(linea)
   print()
   print("Entorno:")
   print(f"  Python:     {sys.version.split()[0]}  ({sys.prefix})")

@@ -1,8 +1,22 @@
 import re
+import shutil
 import socket
 import subprocess
 
 import psutil
+
+
+def npm_argv(args: list[str]) -> list[str] | None:
+  """argv completo para ejecutar npm con `args`, o None si npm no está.
+
+  Devuelve la ruta absoluta (shutil.which) en vez del nombre corto para que
+  funcione igual en macOS/Linux (binario) y en Windows (npm es un .cmd:
+  subprocess no resuelve `npm` a secas porque CreateProcess no busca la
+  extensión .cmd, pero con la ruta completa sí lo ejecuta vía cmd.exe)."""
+  npm = shutil.which("npm")
+  if not npm:
+    return None
+  return [npm, *args]
 
 
 def get_local_ip():

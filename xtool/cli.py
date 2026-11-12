@@ -81,6 +81,13 @@ def _resolve(name_arg):
 def main(argv=None):
   argv = list(sys.argv[1:]) if argv is None else list(argv)
 
+  # Evita UnicodeEncodeError con ✓/✗/→ en consolas Windows con codepage legacy.
+  for stream in (sys.stdout, sys.stderr):
+    try:
+      stream.reconfigure(errors="replace")
+    except Exception:
+      pass
+
   if not argv or argv[0] in ("-h", "--help", "help"):
     if len(argv) > 1 and argv[0] == "help":
       name = _resolve(argv[1])

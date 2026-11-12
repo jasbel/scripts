@@ -4,12 +4,18 @@ Arsenal de herramientas globales expuesto como comando `xtool`
 (alias corto: `x` — ambos apuntan al mismo CLI, p.ej. `x info` equivale a `xtool info`).
 Cada herramienta es un módulo en `xtool/tools/` y se invoca como `xtool <comando>`.
 
-## Instalar el comando `xtool` en esta Mac
+## Instalar el comando `xtool`
 
 Requisito: [uv](https://docs.astral.sh/uv/). Si no está:
 
 ```bash
+# macOS / Linux
 curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
 Desde la raíz del proyecto (`.../scripts`):
@@ -22,11 +28,8 @@ Esto crea un entorno aislado y deja el ejecutable en `~/.local/bin/xtool`.
 Con `--editable` los cambios y las nuevas herramientas que agregues a `xtool/tools/`
 se reflejan sin reinstalar.
 
-Verifica que `~/.local/bin` está en el PATH (zsh):
-
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
-```
+Verifica con `xtool info`: si `~/.local/bin` falta en el PATH, muestra el
+comando exacto para tu OS (zsh, bash o `setx` en Windows).
 
 Comprobar instalación:
 
@@ -41,6 +44,26 @@ x kill-port 3000      # alias corto de xtool
 > Ojo: al agregar o cambiar entry points, un `uv tool upgrade` no basta (no
 > crea los symlinks nuevos) — `xtool update` lo detecta tras el pull y
 > reinstala solo; a mano: `uv tool install --editable . --force`.
+
+## Plataformas (macOS, Linux, Windows)
+
+El arsenal funciona en los tres OS; particularidades por comando:
+
+- **Núcleo y git-\*** (CLI, `update`, `info`, `git-diff`, `git-cherry`,
+  `git-deploy`, `git-separe`): portables. En Windows los ejecutables son
+  `x.exe` / `xtool.exe`.
+- **kill-port**: usa `lsof` si existe, luego contenedores Docker y por último
+  psutil — el fallback lo hace funcionar en los tres OS.
+- **emails**: requiere node/npm en el PATH (en cualquier OS). En Windows,
+  `SOLOCRUCEROS_TEMPLATES_DIR` debe apuntar al repo Symfony en el `.env`
+  (el default es una ruta de Linux).
+- **run-css**: el directorio base de los sitios es una ruta de Linux; en
+  macOS/Windows define `SOLOCRUCEROS_SITES_DIR` en el `.env` apuntando al
+  directorio que contiene `solocruceros.com/` y `solocruceros_latam/`.
+- **npm multiplataforma**: npm se invoca por ruta absoluta (`npm_argv` en
+  `xtool/common/utils_command.py`) porque en Windows npm es un `.cmd` que
+  `subprocess` no resuelve por nombre corto.
+- **Completado zsh**: solo macOS/Linux (Windows usa PowerShell/WSL).
 
 ## Ayuda de un comando
 
