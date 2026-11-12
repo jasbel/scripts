@@ -36,10 +36,11 @@ xtool kill-port 3000  # ejemplo de uso
 x kill-port 3000      # alias corto de xtool
 ```
 
-> El alias `x` se define en `[project.scripts]` de `pyproject.toml`. Al agregar
-> o cambiar entry points no basta con la instalación editable: hay que correr
-> `uv tool install --editable . --force` (un `uv tool upgrade` no crea los
-> symlinks de executables nuevos).
+> El alias `x` se define en `[project.scripts]` de `pyproject.toml`; una
+> instalación (`uv tool install --editable .`) crea `x` y `xtool` juntos.
+> Ojo: al agregar o cambiar entry points, un `uv tool upgrade` no basta (no
+> crea los symlinks nuevos) — `xtool update` lo detecta tras el pull y
+> reinstala solo; a mano: `uv tool install --editable . --force`.
 
 ## Ayuda de un comando
 
