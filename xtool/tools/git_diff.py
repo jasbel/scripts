@@ -39,6 +39,11 @@ local y el conflicto se resuelve a mano. Incompatible con --commit <id>
 
 El commit ganador se copia al portapapeles (solo sin --commit-push, cuando
 aún hay que commitear a mano).
+
+En --commit-push, si el flujo se corta antes del push (fallo del commit,
+conflicto en el pull o push fallido), la descripción generada se copia
+al portapapeles y se guarda además en .git/XTOOL_COMMIT.msg (la
+'papelera'), para reutilizarla al resolver el conflicto sin regenerarla.
 """
 
 import os
@@ -830,6 +835,47 @@ def hacer_commit(mensaje):
   return oneline or True
 
 
+def guardar_papelera(mensaje):
+  """Guarda el mensaje en .git/XTOOL_COMMIT.msg como respaldo (la 'papelera').
+
+  .git no se versiona, así que el archivo no ensucia el worktree ni puede
+  commitearse por accidente. Devuelve la ruta escrita o None si falló.
+  """
+  try:
+    proc = subprocess.run(
+      ["git", "rev-parse", "--git-dir"],
+      capture_output=True,
+      text=True,
+      encoding="utf-8",
+      errors="replace",
+      timeout=10,
+    )
+    if proc.returncode != 0:
+      print("Aviso: no se pudo localizar .git para guardar la descripción")
+      return None
+    ruta = os.path.join(proc.stdout.strip(), "XTOOL_COMMIT.msg")
+    with open(ruta, "w", encoding="utf-8") as f:
+      f.write(mensaje + "\n")
+    print(f"Descripción guardada en {ruta}")
+    return ruta
+  except Exception as e:
+    print(f"Aviso: no se pudo guardar la descripción: {e}")
+    return None
+
+
+def conservar_descripcion(mensaje):
+  """Conserva la descripción cuando el flujo de -y se corta antes del push.
+
+  La copia al portapapeles y la guarda en .git/XTOOL_COMMIT.msg: puede que
+  el commit no llegara a crearse (fallo) o que el conflicto obligue a
+  commitear a mano después, y así no hay que regenerar la descripción.
+  """
+  copiado = copy_to_clipboard(mensaje)
+  ruta = guardar_papelera(mensaje)
+  if not copiado and not ruta:
+    print("Error: no se pudo conservar la descripción (sin portapapeles ni .git)")
+
+
 def rama_actual():
   """Devuelve la rama activa o None (HEAD detached o error de git)."""
   try:
@@ -931,15 +977,25 @@ def commit_y_push(mensaje):
   porque git se niega a mergear con cambios staged; si el merge sale limpio
   (fast-forward o merge commit) se pushea, y solo si termina en conflicto
   NO se pushea: el commit queda a salvo en local y se resuelve a mano.
+  Ante cualquier corte (commit fallido, conflicto, push fallido) la
+  descripción generada se conserva en portapapeles y .git/XTOOL_COMMIT.msg.
   True si todo fue bien.
   """
   if hacer_commit(mensaje) is None:
+    # El commit no llegó a crearse: la descripción solo existe en esta salida
+    print("No se pushea.")
+    conservar_descripcion(mensaje)
     return False
   if not hacer_pull():
     print("No se pushea. El commit quedó a salvo en local; tras resolver el conflicto:")
     print("  git add <archivos> && git commit && git push   (o 'git merge --abort' para descartar el merge)")
+    # El commit local ya lleva la descripción; se conserva para el commit del merge
+    conservar_descripcion(mensaje)
     return False
-  return hacer_push()
+  if not hacer_push():
+    conservar_descripcion(mensaje)
+    return False
+  return True
 
 
 def main(argv=None):
