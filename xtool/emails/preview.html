@@ -12,6 +12,7 @@
       padding: 0;
     }
 
+
     html,
     body {
       height: 100%;
@@ -306,6 +307,7 @@
       width: 100%;
       min-height: calc(100vh - 100px);
     }
+ 
   </style>
 </head>
 
@@ -329,6 +331,10 @@
     <label class="mockup-toggle" id="mockupLabel" title="Mostrar el email dentro de la interfaz del cliente (Gmail/Outlook)">
       <input type="checkbox" id="mockupToggle">
       <span>Mockup</span>
+    </label>
+    <label class="mockup-toggle" id="forwardLabel" title="Vista de reenvío: emula lo que Gmail descarta al reenviar — se pierde el &lt;head&gt; (&lt;style&gt;, media queries, estilos base); solo sobrevive lo inline">
+      <input type="checkbox" id="forwardToggle">
+      <span>Vista reenvío</span>
     </label>
     <div class="send-wrap">
       <button class="send-btn" id="sendBtn" title="Enviar el email renderizado por SMTP">
@@ -436,12 +442,14 @@
       return currentClient === 'gmail-web-mobile';
     }
 
-    // --- Selector de cliente + mockup ---
+    // --- Selector de cliente + mockup + reenvío ---
     let currentClient = 'original';
     let mockupEnabled = false;
+    let forwardEnabled = false;
     const clientSeg = document.getElementById('clientSeg');
     const mockupToggle = document.getElementById('mockupToggle');
     const mockupLabel = document.getElementById('mockupLabel');
+    const forwardToggle = document.getElementById('forwardToggle');
 
     const MOCKUP_CLIENTS = new Set([
       'gmail-web', 'gmail-web-mobile', 'gmail-android', 'gmail-ios',
@@ -452,13 +460,26 @@
       return MOCKUP_CLIENTS.has(c);
     }
 
+    /* Oculta la scrollbar del documento interno del iframe (su <html>).
+     * scrollbar-width es estándar (Firefox/Chrome 121+); ::-webkit-scrollbar
+     * cubre WebKit viejos. Solo afecta al viewport del preview: los
+     * overflow:auto del propio email conservan su scrollbar. */
+    function hideFrameScrollbar(doc) {
+      if (!doc) return;
+      const st = doc.createElement('style');
+      st.textContent = 'html{scrollbar-width:none}html::-webkit-scrollbar,body::-webkit-scrollbar{display:none}';
+      doc.head.appendChild(st);
+    }
+
     function reloadFrame() {
       status.textContent = 'cargando…';
+      const fwd = forwardEnabled ? '?forward=1' : '';
 
       // Mockup = documento completo → navegar el iframe
       if (mockupEnabled && clientHasMockup(currentClient)) {
-        frame.src = routeBase + '/preview/' + currentClient;
+        frame.src = routeBase + '/preview/' + currentClient + fwd;
         frame.onload = () => {
+          hideFrameScrollbar(frame.contentDocument);
           status.textContent = 'live';
           status.style.opacity = .6;
         };
@@ -467,7 +488,7 @@
 
       // Vista limpia: swap head/body (preserva caché de imágenes)
       const url = currentClient === 'original' ? routeBase + '/render' : routeBase + '/render/' + currentClient;
-      fetch(url, { cache: 'no-cache' })
+      fetch(url + fwd, { cache: 'no-cache' })
         .then(r => r.text().then(html => ({ ok: r.ok, html })))
         .then(({ ok, html }) => {
           const doc = frame.contentDocument;
@@ -475,6 +496,7 @@
             // Si el iframe tiene un src de mockup, hay que volver a /render
             frame.src = url;
             frame.onload = () => {
+              hideFrameScrollbar(frame.contentDocument);
               status.textContent = 'live';
               status.style.opacity = .6;
             };
@@ -494,6 +516,7 @@
           doc.head.innerHTML = parsed.head.innerHTML;
           doc.body.innerHTML = parsed.body.innerHTML;
           doc.body.style.margin = 0;
+          hideFrameScrollbar(doc);
           status.textContent = 'live';
           status.style.opacity = .6;
         })
@@ -528,6 +551,11 @@
         // Forzar width web para ver el chrome completo (móvil para el webmail móvil)
         setWidth(isMobileViewportClient() ? '390' : 'web');
       }
+      reloadFrame();
+    });
+
+    forwardToggle.addEventListener('change', () => {
+      forwardEnabled = forwardToggle.checked;
       reloadFrame();
     });
 
