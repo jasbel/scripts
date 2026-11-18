@@ -1,0 +1,15 @@
+{
+  "siteName": "SoloCruceros.com",
+  "siteUrl": "https://pre.solocruceros.com",
+  "apiUrl": "https://apisandbox.solocruceros.com",
+  "nameClient": "Miriam Vallverdú",
+  "titleMailContent": "Recupera tu contraseña",
+  "title": "Recupera tu contraseña",
+  "title": "¡Te damos la bienvenida a tu área de cliente!",
+  "email": "reservas@solocruceros.com",
+  "siteEmail": "reservas@solocruceros.com",
+  "logoPhoneImg": "https://apisandbox.solocruceros.com/uploads/email/logos/logo.png",
+  "urlConfirmEmail": "https://apisandbox.solocruceros.com/confirmar/email",
+  "urlRecoveryPassword": "https://apisandbox.solocruceros.com/restablecer/password",
+  "urlWelcomeEmail": "https://apisandbox.solocruceros.com/welcome"
+}

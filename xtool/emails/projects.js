@@ -67,8 +67,42 @@ function odooTemplates() {
     }));
 }
 
+/* Plantillas solocruceros expuestas en el preview:
+ *   - reserve-new.mustache  -> id "reserve" (rutas legacy /render, /preview/:client), datos data.json
+ *   - sc-*.mustache         -> id = nombre de archivo sin extension, datos json/sc-data.json
+ * Solo ficheros en la raiz de TEMPLATES_DIR (components/ y layout/ son parciales,
+ * no entries). Los sc-* comparten un unico sc-data.json y los partials de components/. */
+function solocrucerosTemplates() {
+  const dir = PATHS.templatesDir;
+  const templates = [];
+  if (fs.existsSync(PATHS.mustache)) {
+    templates.push({
+      id: 'reserve',
+      entry: PATHS.mustache,
+      dataJson: PATHS.dataJson,
+      partialsDir: PATHS.componentsDir,
+    });
+  }
+  if (fs.existsSync(dir)) {
+    const scFiles = fs.readdirSync(dir, { withFileTypes: true })
+      .filter((d) => d.isFile() && /^sc-.+\.mustache$/.test(d.name))
+      .map((d) => d.name)
+      .sort();
+    for (const f of scFiles) {
+      templates.push({
+        id: f.replace(/\.mustache$/, ''),
+        entry: path.join(dir, f),
+        dataJson: PATHS.scDataJson,
+        partialsDir: PATHS.componentsDir,
+      });
+    }
+  }
+  return templates;
+}
+
 export function listProjects() {
-  const solocrucerosAvailable = fs.existsSync(PATHS.mustache);
+  const solocrucerosTpl = solocrucerosTemplates();
+  const solocrucerosAvailable = solocrucerosTpl.length > 0;
   return [
     {
       id: 'solocruceros',
@@ -76,15 +110,8 @@ export function listProjects() {
       available: solocrucerosAvailable,
       reason: solocrucerosAvailable
         ? null
-        : `No se encuentra ${PATHS.mustache}. Define SOLOCRUCEROS_TEMPLATES_DIR en .env apuntando al directorio de templates del repo PHP.`,
-      templates: [
-        {
-          id: 'reserve',
-          entry: PATHS.mustache,
-          dataJson: PATHS.dataJson,
-          partialsDir: PATHS.componentsDir,
-        },
-      ],
+        : `No se encuentra reserve-new.mustache ni sc-*.mustache en ${PATHS.templatesDir}. Define SOLOCRUCEROS_TEMPLATES_DIR en .env apuntando al directorio de templates del repo PHP.`,
+      templates: solocrucerosTpl,
     },
     {
       id: 'odoo',
@@ -139,6 +166,7 @@ export function watchTargets() {
     targets.push(path.join(solocrucerosDir, '**', '*.mustache'));
   }
   if (fs.existsSync(PATHS.dataJson)) targets.push(PATHS.dataJson);
+  if (fs.existsSync(PATHS.scDataJson)) targets.push(PATHS.scDataJson);
   if (fs.existsSync(PATHS.odooRoot)) {
     // Fuentes del repo externo (cambian -> rebuild externo -> cambia templates/)
     targets.push(path.join(PATHS.odooRoot, 'src', 'template', '**', '*.html'));

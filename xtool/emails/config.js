@@ -20,10 +20,17 @@ const ODOO_TEMPLATES_ROOT = process.env.ODOO_TEMPLATES_DIR
 
 export const PATHS = {
   templatesDir: TEMPLATES_DIR,
+  // Entry principal del proyecto solocruceros (id "reserve" en el preview;
+  // tambien lo usa `xtool emails extract` contra referenceHtml).
+  // El preview descubre ADEMAS cualquier sc-*.mustache en TEMPLATES_DIR
+  // (ver solocrucerosTemplates() en projects.js) — no hace falta registrarlos.
   mustache: path.join(TEMPLATES_DIR, 'reserve-new.mustache'),
   referenceHtml: path.join(TEMPLATES_DIR, 'reserve.html'),
   componentsDir: path.join(TEMPLATES_DIR, 'components'),
   dataJson: path.join(__dirname, 'data.json'),
+  // Datos para los templates sc-*.mustache (modelo distinto al de reserve):
+  // comparten este unico JSON entre todos.
+  scDataJson: path.join(__dirname, 'json', 'sc-data.json'),
   odooRoot: ODOO_TEMPLATES_ROOT,
   odooTemplatesDir: path.join(ODOO_TEMPLATES_ROOT, 'templates'),
   odooDataJson: path.join(ODOO_TEMPLATES_ROOT, 'data.json'),
