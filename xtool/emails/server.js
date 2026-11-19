@@ -8,7 +8,7 @@ import chokidar from 'chokidar';
 import { PATHS } from './config.js';
 import { listProjects, getTemplate, watchTargets } from './projects.js';
 import { sendTestHtml, SMTP_ENV } from './send.js';
-import { filterForClient, getSupportedClients } from './email-client-filter.js';
+import { filterForClient, getSupportedClients, stripForForward } from './email-client-filter.js';
 import { wrapInMockup, hasMockup, buildMockupContext } from './email-mockups.js';
 import { compileAll, watchMjml } from './mjml-build.js';
 
@@ -72,6 +72,13 @@ function checkClient(res, client) {
   return true;
 }
 
+/* ?forward=1 → vista de reenvío (Gmail): sin <head>, sin <style>, sin <link>.
+ * Se aplica ANTES de filterForClient para que el CSS motor del cliente
+ * (que representa al propio cliente, no al email) sobreviva. */
+function maybeForward(html, req) {
+  return req.query.forward ? stripForForward(html) : html;
+}
+
 /* =========================================================================
  * API: registro de proyectos/plantillas (lo consume el selector de preview)
  * ========================================================================= */
@@ -120,7 +127,7 @@ app.get('/assets/*', (req, res) => {
 app.get('/:project/:tpl/render', (req, res) => {
   try {
     const t = templateFrom(req);
-    res.type('html').send(withHotReload(t.render()));
+    res.type('html').send(withHotReload(maybeForward(t.render(), req)));
   } catch (e) {
     sendErr(res, e);
   }
@@ -130,7 +137,8 @@ app.get('/:project/:tpl/render/:client', (req, res) => {
   if (!checkClient(res, req.params.client)) return;
   try {
     const t = templateFrom(req);
-    res.type('html').send(withHotReload(filterForClient(t.render(), req.params.client)));
+    const html = filterForClient(maybeForward(t.render(), req), req.params.client);
+    res.type('html').send(withHotReload(html));
   } catch (e) {
     sendErr(res, e);
   }
@@ -140,7 +148,7 @@ app.get('/:project/:tpl/preview/:client', (req, res) => {
   if (!checkClient(res, req.params.client)) return;
   try {
     const t = templateFrom(req);
-    const filtered = filterForClient(t.render(), req.params.client);
+    const filtered = filterForClient(maybeForward(t.render(), req), req.params.client);
 
     if (!hasMockup(req.params.client)) {
       return res.type('html').send(withHotReload(filtered));
@@ -203,9 +211,9 @@ app.post('/:project/:tpl/send-test', sendTestRoute);
  * Rutas legacy (solocruceros/reserve) — compatibilidad con bookmarks
  * ========================================================================= */
 
-app.get('/render', (_req, res) => {
+app.get('/render', (req, res) => {
   try {
-    res.type('html').send(withHotReload(getTemplate('solocruceros', 'reserve').render()));
+    res.type('html').send(withHotReload(maybeForward(getTemplate('solocruceros', 'reserve').render(), req)));
   } catch (e) {
     sendErr(res, e);
   }
@@ -214,7 +222,8 @@ app.get('/render', (_req, res) => {
 app.get('/render/:client', (req, res) => {
   if (!checkClient(res, req.params.client)) return;
   try {
-    res.type('html').send(withHotReload(filterForClient(getTemplate('solocruceros', 'reserve').render(), req.params.client)));
+    const html = filterForClient(maybeForward(getTemplate('solocruceros', 'reserve').render(), req), req.params.client);
+    res.type('html').send(withHotReload(html));
   } catch (e) {
     sendErr(res, e);
   }
@@ -224,7 +233,7 @@ app.get('/preview/:client', (req, res) => {
   if (!checkClient(res, req.params.client)) return;
   try {
     const t = getTemplate('solocruceros', 'reserve');
-    const filtered = filterForClient(t.render(), req.params.client);
+    const filtered = filterForClient(maybeForward(t.render(), req), req.params.client);
     if (!hasMockup(req.params.client)) {
       return res.type('html').send(withHotReload(filtered));
     }

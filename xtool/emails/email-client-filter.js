@@ -545,6 +545,25 @@ function ensureBodyWrapper(html) {
   );
 }
 
+/* ============================================================================
+ * 3.5 VISTA DE REENVÍO (forward)
+ * ========================================================================== */
+
+/**
+ * Emula el reenvío desde Gmail: al componer el mensaje reenviado, Gmail
+ * descarta el <head> del original, así que se pierden los bloques <style>,
+ * los <link> y con ellos las media queries y los estilos base (clases/id).
+ * Solo sobreviven los estilos inline y los atributos HTML
+ * (width, bgcolor, align...).
+ */
+function stripForForward(html) {
+  let out = html.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
+  // <style> y <link> que queden fuera del head (p.ej. dentro del body)
+  out = out.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  out = out.replace(/<link\b[^>]*>/gi, '');
+  return out;
+}
+
 // ============================================================================
 // 4. API PRINCIPAL
 // ============================================================================
@@ -622,6 +641,7 @@ export {
   filterForClient,
   getSupportedClients,
   getClientInfo,
+  stripForForward,
   extractStyles,
   filterCssBlock,
   filterInlineStyle,

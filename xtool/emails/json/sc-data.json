@@ -1,0 +1,36 @@
+{
+  "siteName": "SoloCruceros.com",
+  "siteUrl": "https://pre.solocruceros.com",
+  "apiUrl": "https://apisandbox.solocruceros.com",
+  "nameClient": "Miriam Vallverdú",
+  "titleMailContent": "Recupera tu contraseña",
+  
+  "no-valid-section": "CONFIRMACION DE EMAIL ",
+  "title": "Confirmacion de email ",
+
+
+  "no-valid-section": "RECUPERAR ",
+  "title": "Recupera tu contraseña",
+
+  
+  "no-valid-section": "SILVER",
+  "title": "¡Enhorabuena! Has ascendido al <span style='color: #FF1B63;'>Nivel Silver</span>",
+  "urlBanner": "https://apisandbox.solocruceros.com/uploads/email/banners/banner-silver.jpg?v=1",
+
+    
+  "no-valid-section": "BIENVENIDO",
+  "title": "¡Te damos la bienvenida a tu área de cliente!",
+  "urlBanner": "https://apisandbox.solocruceros.com/uploads/email/banners/banner-welcome.jpg?v=1",
+
+    
+  "no-valid-section": "GOLD ",
+  "title": "¡Felicidades! Ya eres miembro <span style='color: #FF1B63;'>Nivel Gold</span>",
+  "urlBanner": "https://apisandbox.solocruceros.com/uploads/email/banners/banner-gold.jpg?v=1",
+
+  "email": "reservas@solocruceros.com",
+  "siteEmail": "reservas@solocruceros.com",
+  "logoPhoneImg": "https://apisandbox.solocruceros.com/uploads/email/logos/logo.png",
+  "urlConfirmEmail": "https://apisandbox.solocruceros.com/confirmar/email",
+  "urlRecoveryPassword": "https://apisandbox.solocruceros.com/restablecer/password",
+  "urlWelcomeEmail": "https://apisandbox.solocruceros.com/welcome"
+}

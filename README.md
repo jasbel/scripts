@@ -60,6 +60,9 @@ El arsenal funciona en los tres OS; particularidades por comando:
 - **run-css**: el directorio base de los sitios es una ruta de Linux; en
   macOS/Windows define `SOLOCRUCEROS_SITES_DIR` en el `.env` apuntando al
   directorio que contiene `solocruceros.com/` y `solocruceros_latam/`.
+- **pdf2doc**: requiere `uv` en el PATH (solo la primera vez, para
+  auto-instalar pdf2docx); luego el binario se resuelve solo también en
+  `~/.local/bin`. Portable en los tres OS.
 - **npm multiplataforma**: npm se invoca por ruta absoluta (`npm_argv` en
   `xtool/common/utils_command.py`) porque en Windows npm es un `.cmd` que
   `subprocess` no resuelve por nombre corto.
@@ -428,6 +431,45 @@ xtool git-separe --sat ltp=DDD/1_Presentation/Web/latampass   # satélite extra
   de satélite presentes en el checkout (`--repo <id>` la fuerza).
 - El formato antiguo (`satelites` plano) sigue funcionando como repo único
   (se avisa); la clave ya inexistente `sufijo_slice` se ignora.
+
+## pdf2doc
+
+`xtool pdf2doc` convierte PDF a DOCX manteniendo layout, tablas e imágenes,
+con pdf2docx. El DOCX se genera junto al original (mismo nombre, misma
+carpeta). Si pdf2docx no está en la máquina, se instala solo con
+`uv tool install pdf2docx` la primera vez.
+
+```bash
+xtool pdf2doc informe.pdf          # genera informe.docx junto al original
+xtool pdf2doc a.pdf b.pdf c.pdf    # varios a la vez
+```
+
+- PDFs escaneados (texto en imagen) no se convierten: necesitarían OCR antes.
+- Acepta rutas absolutas o relativas desde cualquier directorio; la salida
+  siempre queda junto al PDF de origen.
+
+## images
+
+`xtool images` optimiza imágenes (JPG, PNG, WebP) para web con las
+herramientas nativas del sistema (imagemagick, jpegoptim, pngquant, oxipng,
+cwebp). La original nunca se modifica: la salida se crea junto a ella con
+sufijo `-opt` (`foto.jpg` → `foto-opt.jpg`; con escala `foto-2x-opt.jpg`).
+Si faltan herramientas, ofrece instalarlas (brew, o `sudo apt` como fallback).
+
+```bash
+xtool images foto.jpg assets/ otra.png  # varias rutas (archivos y directorios)
+xtool images                            # busca en el directorio actual, lista y confirma
+xtool images --2x header.png            # escala 200% (retina) y luego optimiza
+xtool images --1.5x --to-webp logo.png  # 150% convertido a WebP
+xtool images --dry                      # solo listar qué se haría
+```
+
+- `--2x` / `--1.5x` / `--scale N`: escalar antes de optimizar.
+- `-q N`: calidad JPG/WebP (default 82); `--lossless` optimiza sin pérdida.
+- `--to-webp`: salida convertida a WebP; `--force` sobrescribe `-opt` existentes;
+  `--yes` no pide confirmaciones.
+- Al buscar imágenes se saltan las salidas `*-opt.*` y directorios como
+  `node_modules`, `.git`, `vendor` (re-ejecutar en un directorio es seguro).
 
 ## info
 
