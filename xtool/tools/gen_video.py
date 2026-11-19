@@ -3,10 +3,11 @@
 
 Uso:
   xtool gen-video "un gato astronauta flotando en el espacio"
-  xtool gen-video "prompt..." --quality quality --size 1280x720
+  xtool gen-video "prompt..." --quality speed --size 1280x720 # más rápido de generar
   xtool gen-video "prompt..."                        # descarga el mp4 en ~/Downloads
   xtool gen-video "prompt..." --out video.mp4        # lo descarga en otra ruta
-  xtool gen-video --image foto.png "anima esta foto" # imagen -> video
+  xtool gen-video --image foto.png "anima la foto"   # imagen + texto -> video
+  xtool gen-video --image a.png --image b.png "..."  # primera y última frame
   xtool gen-video --task <id>                        # retoma una tarea previa
   xtool gen-video "prompt..." --no-wait              # solo crea la tarea y sale
 
@@ -15,21 +16,29 @@ y al terminar imprime las URLs del video y la portada y descarga el mp4
 (requests) en ~/Downloads; con --out se indica otra ruta (directorio o
 archivo .mp4) y con --no-download no se descarga.
 
-Opciones:
+Opciones (los defaults ya maximizan la tarifa plana de $0.2 por video):
   --model <nombre>     default cogvideox-3
-  --quality <modo>     speed (default) | quality
-  --size <WxH>         default 1920x1080 (hasta 3840x2160)
-  --fps <30|60>        default 30
-  --duration <5|10>    segundos de video, default 5
+  --quality <modo>     quality (default) | speed (se genera más rápido)
+  --size <WxH>         720p a 4K: 1280x720, 720x1280, 1024x1024, 1920x1080,
+                       1080x1920, 2048x1080, 3840x2160 (default)
+  --fps <30|60>        default 60
+  --duration <5|10>    segundos de video, default 10
   --no-audio           desactiva el audio generado por IA
-  --image <ruta|url>   imagen inicial (image-to-video); una ruta local se
-                       lee y se envía como base64
+  --image <ruta|url>   imagen para image-to-video (repetible o separada por
+                       comas). Con 2 imágenes: modo primera y última frame
+                       (la API solo lo permite en speed). Ruta local: png/jpg/
+                       jpeg, máx 5M, se envía como base64
   --out <ruta>         dónde descargar el mp4 (directorio o archivo .mp4);
                        default: ~/Downloads
   --no-download        no descarga el video, solo imprime las URLs
+  --dry-run            muestra la petición sin llamar a la API (no cobra)
   --task <id>          no crea tarea nueva: espera y descarga la de ese ID
   --no-wait            crea la tarea, imprime su ID y termina sin esperar
-  --timeout <seg>      máximo de espera, default 900
+  --timeout <seg>      máximo de espera, default 1800
+
+Precio oficial (a la fecha): $0.2 por video, tarifa plana — cuesta lo mismo
+5s que 10s, cualquier resolución y speed/quality. Por eso los defaults ya van
+al máximo (10s · 60fps · quality · 4K); baja solo lo que necesites.
 
 Requiere TOKEN_AI en el .env del proyecto o del arsenal.
 """
@@ -37,7 +46,6 @@ Requiere TOKEN_AI en el .env del proyecto o del arsenal.
 import base64
 import mimetypes
 import os
-import re
 import sys
 import time
 from pathlib import Path
@@ -49,15 +57,18 @@ from xtool.env_local import load_env
 
 load_env()
 
-USAGE = 'Uso: xtool gen-video "prompt" [--quality speed|quality] [--size WxH] [--fps 30|60] [--duration 5|10] [--image <ruta|url>] [--out <ruta> | --no-download] [--task <id>] [--no-wait] [--no-audio] [--timeout <seg>]'
+USAGE = 'Uso: xtool gen-video "prompt" [--quality speed|quality] [--size WxH] [--fps 30|60] [--duration 5|10] [--image <ruta|url>]... [--out <ruta> | --no-download] [--task <id>] [--no-wait] [--no-audio] [--dry-run] [--timeout <seg>]'
 
 POLL_SECONDS = 5
-DEFAULT_TIMEOUT = 900
+DEFAULT_TIMEOUT = 1800
 
 VALID_QUALITY = ("speed", "quality")
 VALID_FPS = (30, 60)
 VALID_DURATION = (5, 10)
-SIZE_RE = re.compile(r"^\d{3,4}x\d{3,4}$")
+SIZES = ("720x1280", "1024x1024", "1080x1920", "1280x720", "1920x1080", "2048x1080", "3840x2160")
+VALID_IMAGE_EXT = (".png", ".jpg", ".jpeg")
+MAX_IMAGE_MB = 5
+MAX_PROMPT_CHARS = 512
 
 
 def parse_args(args):
@@ -65,22 +76,24 @@ def parse_args(args):
   opts = {
     "prompt": None,
     "model": "cogvideox-3",
-    "quality": "speed",
-    "size": "1920x1080",
-    "fps": 30,
-    "duration": 5,
+    "quality": "quality",
+    "size": "3840x2160",
+    "fps": 60,
+    "duration": 10,
     "audio": True,
-    "image": None,
+    "images": [],
     "out": None,
     "task": None,
     "no_wait": False,
     "no_download": False,
+    "dry_run": False,
     "timeout": DEFAULT_TIMEOUT,
   }
   flags = {
     "--no-audio": "audio",
     "--no-wait": "no_wait",
     "--no-download": "no_download",
+    "--dry-run": "dry_run",
   }
   valores = {
     "--model": "model",
@@ -88,7 +101,6 @@ def parse_args(args):
     "--size": "size",
     "--fps": "fps",
     "--duration": "duration",
-    "--image": "image",
     "--out": "out",
     "--task": "task",
     "--timeout": "timeout",
@@ -101,6 +113,17 @@ def parse_args(args):
     if a in flags:
       opts[flags[a]] = False if flags[a] == "audio" else True
       i += 1
+      continue
+    if a == "--image" or a.startswith("--image="):
+      if "=" in a:
+        valor = a.split("=", 1)[1]
+        i += 1
+      else:
+        if i + 1 >= len(args):
+          return None, "--image requiere una ruta o URL"
+        valor = args[i + 1]
+        i += 2
+      opts["images"].extend(p.strip() for p in valor.split(",") if p.strip())
       continue
     if a in valores or a.startswith("--") and a.split("=", 1)[0] in valores:
       clave = a.split("=", 1)[0]
@@ -121,11 +144,11 @@ def parse_args(args):
     opts["prompt"] = a
     i += 1
 
-  # --out sin valor (o con valor que es otra cosa) no aplica: exige valor arriba.
+  # Validaciones
   if opts["quality"] not in VALID_QUALITY:
     return None, f"--quality debe ser {' o '.join(VALID_QUALITY)}, no '{opts['quality']}'"
-  if not SIZE_RE.match(str(opts["size"])):
-    return None, f"--size debe tener formato WxH (ej. 1920x1080), no '{opts['size']}'"
+  if opts["size"] not in SIZES:
+    return None, f"--size debe ser una de: {', '.join(SIZES)}"
   try:
     opts["fps"] = int(opts["fps"])
     opts["duration"] = int(opts["duration"])
@@ -138,8 +161,12 @@ def parse_args(args):
     return None, f"--duration debe ser {' o '.join(map(str, VALID_DURATION))} segundos, no {opts['duration']}"
   if opts["timeout"] < 30:
     return None, "--timeout mínimo: 30 segundos"
-  if not opts["task"] and not opts["prompt"] and not opts["image"]:
+  if not opts["task"] and not opts["prompt"] and not opts["images"]:
     return None, "falta el prompt (o usa --image / --task <id>)"
+  if opts["prompt"] and len(opts["prompt"]) > MAX_PROMPT_CHARS:
+    return None, f"el prompt admite hasta {MAX_PROMPT_CHARS} caracteres (recibidos {len(opts['prompt'])})"
+  if len(opts["images"]) > 2:
+    return None, "máximo 2 imágenes (primera y última frame): --image A --image B"
   return opts, None
 
 
@@ -150,11 +177,15 @@ def build_client():
   return ZaiClient(api_key=token)
 
 
-def load_image(image):
-  """Ruta local -> data URI base64; cualquier otra cosa se pasa tal cual (URL)."""
-  p = Path(image).expanduser()
+def load_image(imagen):
+  """Ruta local -> data URI base64 (valida formato y ≤5M); otra cosa se pasa tal cual (URL)."""
+  p = Path(imagen).expanduser()
   if not p.is_file():
-    return image
+    return imagen
+  if p.suffix.lower() not in VALID_IMAGE_EXT:
+    raise ValueError(f"{p.name}: solo se admiten imágenes {'/'.join(VALID_IMAGE_EXT)}")
+  if p.stat().st_size > MAX_IMAGE_MB * 1024 * 1024:
+    raise ValueError(f"{p.name}: supera los {MAX_IMAGE_MB} MB máximos de la API")
   mime = mimetypes.guess_type(p.name)[0] or "image/png"
   b64 = base64.b64encode(p.read_bytes()).decode("ascii")
   return f"data:{mime};base64,{b64}"
@@ -227,8 +258,8 @@ def main(argv=None):
     print(__doc__.strip())
     return 0
 
-  client = build_client()
-  if client is None:
+  client = None if opts["dry_run"] else build_client()
+  if client is None and not opts["dry_run"]:
     print("Error: falta TOKEN_AI (defínelo en el .env del proyecto o del arsenal)")
     return 1
 
@@ -237,15 +268,25 @@ def main(argv=None):
       task_id = opts["task"]
       print(f"Retomando tarea: {task_id}")
     else:
+      imagenes = [load_image(r) for r in opts["images"]]
+      if len(imagenes) == 2 and opts["quality"] == "quality":
+        print("Aviso: primera y última frame solo soporta speed; se cambia a speed")
+        opts["quality"] = "speed"
       resumen = (
         f"{opts['model']} · {opts['quality']} · {opts['size']} · {opts['fps']}fps"
         f" · {opts['duration']}s · audio {'sí' if opts['audio'] else 'no'}"
+        + (f" · {len(imagenes)} imagen(es)" if imagenes else "")
       )
       print(f"Creando tarea: {resumen}")
+      if opts["dry_run"]:
+        print(f"(--dry-run: no se llama a la API) prompt: {opts['prompt'] or '(sin prompt)'}")
+        for n, img in enumerate(imagenes, 1):
+          print(f"  imagen {n}: {'URL' if not img.startswith('data:') else 'base64 (archivo local)'}")
+        return 0
       respuesta = client.videos.generations(
         model=opts["model"],
         prompt=opts["prompt"],
-        image_url=load_image(opts["image"]) if opts["image"] else None,
+        image_url=imagenes[0] if len(imagenes) == 1 else (imagenes or None),
         quality=opts["quality"],
         with_audio=opts["audio"],
         size=opts["size"],
