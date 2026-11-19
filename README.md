@@ -146,6 +146,31 @@ xtool git-diff -y              # forma corta de --commit-push
   generados y, si aún supera el límite, se trunca por archivo dejando un
   resumen (`--compact-summary`) de lo omitido.
 
+## gen-video
+
+`xtool gen-video "prompt"` genera videos con IA (CogVideoX de Z.ai vía
+zai-sdk, con `TOKEN_AI`): crea la tarea asíncrona, muestra los cambios de
+estado y al terminar imprime las URLs y descarga el mp4 en `~/Downloads`.
+
+```bash
+xtool gen-video "un gato astronauta flotando en el espacio"
+xtool gen-video "prompt..." --quality quality --size 3840x2160   # 4K, mejor calidad
+xtool gen-video "prompt..." --duration 10 --fps 60               # 10s a 60fps
+xtool gen-video --image foto.png "anima esta foto"               # imagen -> video
+xtool gen-video "prompt..." --out clip.mp4                        # otra ruta de descarga
+xtool gen-video "prompt..." --no-download                        # solo URLs
+xtool gen-video "prompt..." --no-wait                            # crea la tarea y sale
+xtool gen-video --task <id>                                      # retoma una tarea previa
+```
+
+- Opciones: `--model` (default `cogvideox-3`), `--quality speed|quality`,
+  `--size WxH` (default `1920x1080`, hasta 4K), `--fps 30|60`, `--duration 5|10`,
+  `--no-audio` para desactivar el audio generado por IA.
+- Con `--no-wait` se imprime el ID de la tarea para retomarla después con
+  `--task <id>` (útil también tras un `--timeout`, default 900s).
+- `--image` admite una URL o una ruta local (se envía como base64).
+- Requiere `TOKEN_AI` en el `.env` del proyecto o en el del arsenal.
+
 ## run-css
 
 `xtool run-css` ejecuta `npm run css` (compilación SASS vía gulp) en todos los
