@@ -74,6 +74,7 @@ case $state in
       git-cherry-origin)
         _arguments \
           '--reset[cancela el override vigente]' \
+          '--current[usa el directorio actual como origen]' \
           '--min[duración del override en minutos]:minutos:' \
           '(-h --help)'{-h,--help}'[ayuda]' \
           '1:ruta del repo origen:_path_files -/'

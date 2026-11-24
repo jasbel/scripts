@@ -231,9 +231,16 @@ tiempo limitado, sin tocar `GIT_CHERRY_ORIGEN`:
 ```bash
 xtool git-cherry-origin /ruta/.../Web/symfony_colombia        # activa 30 min
 xtool git-cherry-origin /ruta/.../Web/symfony_mexico --min 60 # otra duración
+xtool git-cherry-origin --current                             # origen = directorio actual
 xtool git-cherry-origin                                       # estado y minutos restantes
 xtool git-cherry-origin --reset                               # cancela ya
 ```
+
+- `--current` toma como origen el directorio desde donde se ejecuta el comando
+  (debe estar dentro de un repo git); combina con `--min`. En ambos casos se
+  guarda la rama actual del repo origen como referencia informativa
+  (`git-cherry` transporta `stash@{0}` o los cambios sin commitear, sin
+  importar la rama).
 
 - El vencimiento es **perezoso**: no hay proceso de fondo; al expirar,
   `git-cherry` vuelve solo al valor de `GIT_CHERRY_ORIGEN` (aunque la máquina
@@ -546,7 +553,7 @@ la completación dinámica funcione, `xtool` debe estar instalado y en el PATH.
 - `xtool emails <TAB>` — subcomandos (`server build watch extract dist`) y
   flags (`--port --no-install`).
 - `xtool git-cherry <TAB>` — directorios; segundo TAB hashes del repo origen.
-- `xtool git-cherry-origin <TAB>` — directorios y flags (`--reset --min`).
+- `xtool git-cherry-origin <TAB>` — directorios y flags (`--reset --current --min`).
 - `xtool git-deploy <TAB>` — hashes recientes del repo actual + `HEAD~N`, y
   flags (`-y --yes -f --force --no-push`).
 

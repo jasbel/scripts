@@ -3,8 +3,14 @@
 
 Uso:
   xtool git-cherry-origin <ruta_origen> [--min N]   # activa el override
+  xtool git-cherry-origin --current [--min N]       # origen = directorio actual
   xtool git-cherry-origin                           # muestra el estado
   xtool git-cherry-origin --reset                   # cancela ya
+
+Con --current el origen es el directorio desde donde se ejecuta el comando
+(debe estar dentro de un repo git). En ambos casos se guarda la rama actual
+del repo origen como referencia; git-cherry no la usa (transporta stash@{0}
+o los cambios sin commitear, sea cual sea la rama).
 
 Durante N minutos (default 30) <ruta_origen> pasa a ser el origen por
 defecto de git-cherry, por encima de GIT_CHERRY_ORIGEN (que nunca se
@@ -30,9 +36,10 @@ from xtool.common import git_cherry_state as estado
 
 
 def _parsear(argv):
-  """Parsea argv. Devuelve (ruta, minutos, error)."""
+  """Parsea argv. Devuelve (ruta, minutos, current, error)."""
   ruta = None
   minutos = 30
+  current = False
 
   def _min_valor(valor):
     try:
@@ -48,23 +55,25 @@ def _parsear(argv):
     arg = argv[i]
     if arg == "--min":
       if i + 1 >= len(argv):
-        return None, None, "--min requiere un número de minutos (ej. --min 60)"
+        return None, None, False, "--min requiere un número de minutos (ej. --min 60)"
       minutos, err = _min_valor(argv[i + 1])
       if err:
-        return None, None, err
+        return None, None, False, err
       i += 1
     elif arg.startswith("--min="):
       minutos, err = _min_valor(arg.split("=", 1)[1])
       if err:
-        return None, None, err
+        return None, None, False, err
+    elif arg == "--current":
+      current = True
     elif arg.startswith("-"):
-      return None, None, f"opción desconocida: {arg}"
+      return None, None, False, f"opción desconocida: {arg}"
     elif ruta is None:
       ruta = arg
     else:
-      return None, None, f"argumento inesperado: {arg} (solo se espera una ruta)"
+      return None, None, False, f"argumento inesperado: {arg} (solo se espera una ruta)"
     i += 1
-  return ruta, minutos, None
+  return ruta, minutos, current, None
 
 
 def _mostrar_estado():
@@ -76,6 +85,8 @@ def _mostrar_estado():
     )
   if override:
     print(f"==> Override ACTIVO: {override['origen']}")
+    if override.get("rama"):
+      print(f"    Rama del origen al activar: {override['rama']}")
     print(
       f"    Faltan {estado.minutos_restantes(override)} min "
       f"(expira ~{estado.hora_expiracion(override)})."
@@ -107,16 +118,20 @@ def main(argv=None):
   if not argv:
     return _mostrar_estado()
 
-  ruta, minutos, error = _parsear(argv)
+  ruta, minutos, current, error = _parsear(argv)
   if error:
     print(f"ERROR: {error}")
-    print("Uso: xtool git-cherry-origin <ruta_origen> [--min N] | --reset | (sin args: estado)")
+    print("Uso: xtool git-cherry-origin <ruta_origen> | --current | --reset | (sin args: estado) [--min N]")
     return 1
 
-  if ruta is None:
+  if current and ruta is not None:
+    print("ERROR: --current no se combina con una ruta (usa una u otra)")
+    return 1
+
+  if ruta is None and not current:
     return _mostrar_estado()
 
-  origen = Path(ruta).expanduser().resolve()
+  origen = Path(ruta or Path.cwd()).expanduser().resolve()
   if not origen.is_dir():
     print(f"ERROR: '{origen}' no existe o no es un directorio")
     return 1
@@ -127,9 +142,18 @@ def main(argv=None):
   if top.returncode != 0 or not top.stdout.strip():
     print(f"ERROR: '{origen}' no está dentro de un repo git")
     return 1
+  rama = None
+  head = subprocess.run(
+    ("git", "-C", str(origen), "rev-parse", "--abbrev-ref", "HEAD"),
+    capture_output=True, text=True, check=False,
+  )
+  if head.returncode == 0 and head.stdout.strip():
+    rama = head.stdout.strip()
 
-  datos = estado.escribir_override(str(origen), minutos)
+  datos = estado.escribir_override(str(origen), minutos, rama=rama)
   print(f"==> Origen temporal ACTIVADO: {origen}")
+  if rama:
+    print(f"    Rama actual del origen: {rama}")
   print(f"    Vigente por {minutos} min (hasta ~{estado.hora_expiracion(datos)}).")
   print(f"    Repo origen: {top.stdout.strip()}")
   print(f"    Original conservado: {datos['original'] or '(sin GIT_CHERRY_ORIGEN)'}")

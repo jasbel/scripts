@@ -54,12 +54,13 @@ def leer_override():
   return datos, None
 
 
-def escribir_override(origen: str, minutos: int):
+def escribir_override(origen: str, minutos: int, rama=None):
   """Activa el override y devuelve los datos guardados.
 
   Conserva el valor original de GIT_CHERRY_ORIGEN al momento del cambio
   (solo informativo: al expirar el valor efectivo vuelve a ser el del
-  entorno/.env, que no se toca nunca).
+  entorno/.env, que no se toca nunca). `rama` (opcional) guarda la rama
+  vigente del repo origen al activar, solo como referencia.
   """
   datos = {
     "origen": origen,
@@ -68,6 +69,8 @@ def escribir_override(origen: str, minutos: int):
     "expira_epoch": time.time() + minutos * 60,
     "desde": time.strftime("%Y-%m-%d %H:%M"),
   }
+  if rama:
+    datos["rama"] = rama
   path = _state_file()
   path.parent.mkdir(parents=True, exist_ok=True)
   path.write_text(json.dumps(datos, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
