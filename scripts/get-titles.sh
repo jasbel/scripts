@@ -10,10 +10,11 @@
 # ]
 #
 # Uso:
-#   ./get-titles.sh                                              # local (BASE_URL por defecto)
-#   ./get-titles.sh https://sbox-mediterraneo.solocruceros.com   # pre
-#   BASE_URL="https://..." ./get-titles.sh                       # por variable de entorno
-#   ./get-titles.sh > titles.json                                # guardar a fichero
+#   /home/asbel/projects/scripts/scripts/get-titles.sh                                              # local (BASE_URL por defecto)
+#   /home/asbel/projects/scripts/scripts/get-titles.sh https://sbox-mediterraneo.solocruceros.com   # pre
+#   BASE_URL="https://..." /home/asbel/projects/scripts/scripts/get-titles.sh                       # por variable de entorno
+#   /home/asbel/projects/scripts/scripts/get-titles.sh > titles.json                                # guardar a fichero
+#   /home/asbel/projects/scripts/scripts/get-titles.sh https://sbox-mediterraneo.solocruceros.com   > /home/asbel/Desktop/titles.json
 #
 # Añadir páginas: editar la lista PAGES de abajo.
 #   "Nombre|/ruta-relativa"        → se antepone BASE_URL
