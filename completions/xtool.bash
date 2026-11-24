@@ -16,7 +16,7 @@ _xtool() {
   commands="$(xtool 2>/dev/null | awk '/^Comandos disponibles:/{f=1;next} f&&NF{print $1}')"
   if [[ -z "$commands" ]]; then
     # Fallback estático si xtool no responde
-    commands="emails git-cherry git-deploy git-diff kill-port"
+    commands="emails git-cherry git-deploy git-diff git-replicate kill-port"
   fi
   commands="$commands help"
 
@@ -53,6 +53,14 @@ _xtool() {
       else
         # Commit o rango: hashes recientes del repo actual + atajos útiles
         COMPREPLY=( $(compgen -W "HEAD HEAD~1 HEAD~2 HEAD~3 $(git log --format='%h' -10 2>/dev/null)" -- "$cur") )
+      fi
+      ;;
+    git-replicate|replicate)
+      if [[ "$cur" == -* ]]; then
+        COMPREPLY=( $(compgen -W "--stash -y --yes --no-force -h --help" -- "$cur") )
+      else
+        # Aliases de destino + atajos de commit
+        COMPREPLY=( $(compgen -W "all cl co cr mx home is islas lu lujo me symfony_chile symfony_colombia symfony_costarica symfony_mexico symfony_home symfony_islasgriegas symfony_lujo symfony_mediterraneo HEAD HEAD~1 HEAD~2" -- "$cur") )
       fi
       ;;
     git-diff|kill-port)

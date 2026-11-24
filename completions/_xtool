@@ -16,6 +16,7 @@ fallback=(
   'git-cherry-origin:Cambia temporalmente el origen por defecto de git-cherry'
   'git-deploy:Despliega commits del repo a los clones de preproducción'
   'git-diff:Genera un mensaje de commit Conventional Commits con IA'
+  'git-replicate:Replica un commit del app actual a otros apps symfony_*'
   'info:Muestra información del arsenal xtool'
   'kill-port:Termina el proceso que ocupa un puerto TCP'
   'update:Actualiza este arsenal (git pull)'
@@ -90,6 +91,30 @@ case $state in
           hashes=(${(f)"$(git log --format='%h:%s' -10 2>/dev/null)"})
           hashes+=('HEAD:HEAD actual' 'HEAD~1:commit previo' 'HEAD~2:hace dos commits')
           _describe -t hashes 'commit o rango' hashes
+        fi
+        ;;
+      git-replicate|replicate)
+        _arguments \
+          '--stash[replica los cambios sin commitear, untracked incluido]' \
+          '-y[commitea y pushea cada destino con git-diff -y]' \
+          '--yes[salta la confirmación de -y]' \
+          '--no-force[no fuerza: excluye destinos sucios, deja conflictos UU]' \
+          '(-h --help)'{-h,--help}'[ayuda]' \
+          '*:alias:->aliases'
+        if [[ $state == aliases ]]; then
+          local -a aliases
+          aliases=(
+            'all:todos los apps menos el origen'
+            'cl:symfony_chile'
+            'co:symfony_colombia'
+            'cr:symfony_costarica'
+            'mx:symfony_mexico'
+            'home:symfony_home'
+            'is:symfony_islasgriegas'
+            'lu:symfony_lujo'
+            'me:symfony_mediterraneo'
+          )
+          _describe -t aliases 'alias destino' aliases
         fi
         ;;
       *)

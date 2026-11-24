@@ -1117,6 +1117,6 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-  main()
+  sys.exit(main())
 
 # python3 scripts/git_diff.py

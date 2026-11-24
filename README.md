@@ -90,6 +90,7 @@ xtool diff            # = xtool git-diff
 xtool cherry          # = xtool git-cherry
 xtool cherry-origin   # = xtool git-cherry-origin
 xtool deploy          # = xtool git-deploy
+xtool replicate       # = xtool git-replicate
 xtool separe          # = xtool git-separe
 ```
 
@@ -357,6 +358,60 @@ queda PENDIENTE con los css ya resueltos en staging.
 - La lógica de transporte (modo acotado archivo por archivo con `git apply -3`)
   vive en `xtool/common/git_transport.py`, compartida con `git-cherry`.
 
+## git-replicate
+
+`xtool replicate <alias...> [commit] [--stash] [-y]` replica un commit del
+app actual a otros apps `symfony_*` de las raíces principales (europa y
+latam). Es el flujo "cherry-origin + cherry uno a uno" reducido a un solo
+comando: los cambios quedan **staged sin commitear** en cada destino, con
+la misma maquinaria acotada de git-cherry (lectura local de blobs, sin
+remotos).
+
+```bash
+cd ~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_home
+xtool replicate cl me             # HEAD -> symfony_chile y symfony_mediterraneo
+xtool replicate cl me abc1234     # ese commit concreto
+xtool replicate all --stash       # cambios sin commitear -> todas las apps (y al origen)
+xtool replicate cl me -y          # además commitea+pushea cada destino con git-diff -y
+```
+
+Aliases de destino: `cl co cr mx home is lu me` (también el nombre
+completo, p.ej. `symfony_chile`) y `all` (todos menos el origen).
+
+- **`--stash`**: replica los cambios sin commitear del origen, untracked
+  incluido: crea `git stash push -u`, captura el SHA, lo aplica de vuelta
+  al origen (`git stash apply` + drop) y replica ese snapshot — el origen
+  nunca pierde sus cambios. Si el worktree está limpio pero existe
+  `stash@{0}`, se usa ese (aplicándolo también al origen y conservando la
+  entrada).
+- **Forzado por defecto**: un destino sucio solo avisa y los conflictos de
+  contenido se resuelven con la versión del origen (staged; recuperable de
+  HEAD mientras no se commitee). Con `--no-force` el modo es conservador:
+  destinos sucios excluidos y conflictos UU para resolver a mano.
+- **`-y`**: commitea y pushea cada destino ejecutando `xtool git-diff -y`
+  en su repo (mensaje Conventional Commits con IA + commit + pull + push).
+  Como toca remotos, pide Enter antes de empezar; `--yes` lo salta.
+- Un destino con conflictos o fallos queda reportado (PENDIENTE / FALLO) y
+  se continúa con los demás. Exit 1 si algo quedó pendiente.
+- Los apps que comparten repo con el origen (p.ej. home → mediterraneo,
+  ambos en europa) no interfieren: el apply del stash al origen ocurre
+  antes de tocar destinos, y el chequeo de "destino sucio" solo mira el
+  subdirectorio del app destino.
+
+Los destinos se buscan como `<raíz>/symfony_<app>` en
+`~/.config/xtool/replicate.json` (o la ruta de la variable
+`GIT_REPLICATE_CONFIG`) — solo las raíces principales; los clones de
+preproducción siguen siendo territorio de `git-deploy`:
+
+```json
+{
+  "raices": [
+    "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web",
+    "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web"
+  ]
+}
+```
+
 ## git-separe
 
 `xtool git-separe` separa los cambios de una rama en **ramas satélite por
@@ -535,6 +590,8 @@ El script `completions/xtool.bash` agrega autocompletado con TAB:
 - `xtool emails <TAB>` — subcomandos (`server build watch extract`) y
   `xtool emails -<TAB>` — flags (`--port --no-install -h --help`).
 - `xtool git-cherry <TAB>` — directorios (ruta del repo origen).
+- `xtool replicate <TAB>` — aliases de destino (`all cl co cr mx home is lu
+  me` + nombres completos) y flags (`--stash -y --yes --no-force`).
 
 Activación: agregar al final del `~/.bashrc` (ajustar la ruta si el repo
 vive en otro lugar):
@@ -556,6 +613,8 @@ la completación dinámica funcione, `xtool` debe estar instalado y en el PATH.
 - `xtool git-cherry-origin <TAB>` — directorios y flags (`--reset --current --min`).
 - `xtool git-deploy <TAB>` — hashes recientes del repo actual + `HEAD~N`, y
   flags (`-y --yes -f --force --no-push`).
+- `xtool replicate <TAB>` — aliases de destino con descripción y flags
+  (`--stash -y --yes --no-force`).
 
 ## Actualizar / desinstalar
 
