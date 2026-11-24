@@ -117,6 +117,14 @@ def escribir_blob(origen_repo: Path, repo_root: Path, rev: str, path: str, desti
   run("git", "add", "--", destino, cwd=repo_root)
 
 
+def ultima_version_destino(repo_root: Path, destino: str) -> str:
+  """Describe la versión que el destino tiene en HEAD: 'sha fecha subject' del último commit que la tocó."""
+  return out(
+    "git", "log", "-1", "--format=%h %ad %s", "--date=short", "--", destino,
+    cwd=repo_root,
+  ).strip()
+
+
 def es_conflicto(archivo: Path) -> bool:
   """True si el archivo quedó con marcadores de conflicto (<<<<<<< / >>>>>>>)."""
   try:
@@ -257,7 +265,10 @@ def aplicar_acotado(repo_root: Path, origen_repo: Path, commit: str, origen_sub:
   Archivos ya existentes en el destino (vengan como nuevos o modificados en
   el origen): la versión del ORIGEN los REEMPLAZA y queda staged. La versión
   previa sigue en HEAD, así que se recupera mientras no se commitee; ya no se
-  generan archivos <ruta>.desde_origen.
+  generan archivos <ruta>.desde_origen. Cuando el archivo es NUEVO en el
+  origen pero ya existía en el destino (incongruencia de historiales), el
+  log detalla ambos lados: commit del origen que lo agrega y commit del
+  destino del que venía la versión reemplazada.
 
   Devuelve un resumen dict con contadores:
   {aplicados, agregados, reemplazados, eliminados, conflictos, fuera}
@@ -298,10 +309,13 @@ def aplicar_acotado(repo_root: Path, origen_repo: Path, commit: str, origen_sub:
       else:
         print(f"    Omiso (eliminado en el origen, no existía en destino): {destino}")
     elif status in ("A", "T"):
+      previo = ultima_version_destino(repo_root, destino) if existe_head else ""
       escribir_blob(origen_repo, repo_root, commit, path, destino)
       if existe_head:
         resumen["reemplazados"] += 1
         print(f"    Reemplazado: {path} -> {destino} (nuevo en el origen, ya existía en el destino)")
+        print(f"      Incongruencia de historiales: no existía en el origen (agregado en {commit[:8]});")
+        print(f"      el destino lo tenía de: {previo or '(commit desconocido)'}")
       else:
         resumen["agregados"] += 1
         print(f"    Agregado: {path} -> {destino}")
@@ -332,6 +346,9 @@ def aplicar_acotado(repo_root: Path, origen_repo: Path, commit: str, origen_sub:
   resumen["conflictos"] = conflictos
   if fuera:
     print(f"==> {fuera} archivo(s) del commit fuera de {origen_sub}/ fueron ignorados.")
+  if resumen["reemplazados"]:
+    print(f"==> {resumen['reemplazados']} archivo(s) existentes REEMPLAZADOS por la versión del origen.")
+    print("    Las versiones previas siguen en HEAD: verlas con 'git show HEAD:<ruta>' (antes de commitear).")
   if conflictos:
     print(f"==> {conflictos} archivo(s) quedaron como merge conflict (sin resolver):")
     print("    Lista: git diff --name-only --diff-filter=U")

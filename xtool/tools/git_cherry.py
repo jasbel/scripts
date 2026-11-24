@@ -48,7 +48,9 @@ origen, p.ej. .../Web/symfony_home):
     en HEAD, se recupera mientras no se commitee).
   - Si un archivo del commit ya existe en el destino (aunque en el origen
     venga como NUEVO), la versión del origen lo REEMPLAZA (staged). Ya no se
-    generan archivos <ruta>.desde_origen.
+    generan archivos <ruta>.desde_origen; el log detalla la incongruencia:
+    commit del origen que lo agrega y commit del destino del que venía la
+    versión reemplazada (recuperable de HEAD mientras no se commitee).
 
 Modo repo completo (la ruta origen ES la raíz del repo origen):
   - Agrega un remote temporal apuntando a la raíz del repo origen.
