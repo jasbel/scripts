@@ -44,7 +44,11 @@ origen, p.ej. .../Web/symfony_home):
     agrega completo; si queda con marcadores de conflicto se marca como merge
     conflict (unmerged, visible en 'git status' y con
     'git diff --diff-filter=U') para resolver a mano; si no, la versión del
-    origen queda como <ruta>.desde_origen para revisión manual.
+    origen REEMPLAZA al archivo del destino (staged; la versión previa queda
+    en HEAD, se recupera mientras no se commitee).
+  - Si un archivo del commit ya existe en el destino (aunque en el origen
+    venga como NUEVO), la versión del origen lo REEMPLAZA (staged). Ya no se
+    generan archivos <ruta>.desde_origen.
 
 Modo repo completo (la ruta origen ES la raíz del repo origen):
   - Agrega un remote temporal apuntando a la raíz del repo origen.
@@ -55,8 +59,8 @@ Modo repo completo (la ruta origen ES la raíz del repo origen):
   - En conflictos modify/delete típicos cross-repo (el archivo llegó con un
     prefijo de ruta extra), mapea la ruta al sufijo que exista en el destino
     (quitando 1..n componentes iniciales) y aplica el diff del origen.
-  - Si el diff no aplica limpio, deja la versión del origen como
-    <ruta>.desde_origen para revisión manual.
+  - Si el diff no aplica limpio, la versión del origen REEMPLAZA al archivo
+    del destino (staged; la versión previa queda en HEAD).
   - Los conflictos de contenido quedan listados para resolver a mano.
   - Siempre remueve el remote temporal y sale del estado cherry-pick
     conservando el staging.

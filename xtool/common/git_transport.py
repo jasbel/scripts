@@ -117,11 +117,6 @@ def escribir_blob(origen_repo: Path, repo_root: Path, rev: str, path: str, desti
   run("git", "add", "--", destino, cwd=repo_root)
 
 
-def guardar_desde_origen(origen_repo: Path, repo_root: Path, rev: str, path: str, destino: str):
-  """Deja la versión del origen como <destino>.desde_origen para revisión manual."""
-  (repo_root / f"{destino}.desde_origen").write_bytes(bytes_blob(origen_repo, rev, path))
-
-
 def es_conflicto(archivo: Path) -> bool:
   """True si el archivo quedó con marcadores de conflicto (<<<<<<< / >>>>>>>)."""
   try:
@@ -235,12 +230,10 @@ def resolver_conflictos(repo_root: Path, origen_repo: Path, commit: str, patch_f
       run("git", "add", "--", sin_prefijo, cwd=repo_root)
       print(f"    Resuelto: {path} -> {sin_prefijo} (diff aplicado)")
     else:
-      # No aplica limpio (ej. artefacto compilado con formato distinto).
-      version_origen = out("git", "show", f"{commit}:{path}", cwd=origen_repo)
-      destino_revision = repo_root / f"{sin_prefijo}.desde_origen"
-      destino_revision.write_text(version_origen)
-      print(f"    ATENCION: {path} -> {sin_prefijo} NO aplica limpio.")
-      print(f"      Revisa {destino_revision.name} y decide (si es compilado, regenera con tu build).")
+      # No aplica limpio (ej. artefacto compilado con formato distinto):
+      # la versión del origen REEMPLAZA al destino (staged, recuperable de HEAD).
+      escribir_blob(origen_repo, repo_root, commit, path, sin_prefijo)
+      print(f"    Reemplazado: {path} -> {sin_prefijo} (el diff del origen no aplicaba limpio)")
 
   # Conflictos de contenido clásicos: quedan para resolver a mano
   pendientes = [
@@ -261,10 +254,14 @@ def aplicar_acotado(repo_root: Path, origen_repo: Path, commit: str, origen_sub:
   Sin cherry-pick (sin detección de renombres): nada puede salir del
   subdirectorio destino. Archivo por archivo con 'git apply -3'.
 
+  Archivos ya existentes en el destino (vengan como nuevos o modificados en
+  el origen): la versión del ORIGEN los REEMPLAZA y queda staged. La versión
+  previa sigue en HEAD, así que se recupera mientras no se commitee; ya no se
+  generan archivos <ruta>.desde_origen.
+
   Devuelve un resumen dict con contadores:
-  {aplicados, agregados, eliminados, conflictos, atenciones, fuera}
-  ('atenciones' = archivos que quedaron .desde_origen o ya existían:
-  requieren revisión manual).
+  {aplicados, agregados, reemplazados, eliminados, conflictos, fuera}
+  ('conflictos' = archivos con marcadores de merge, sin resolver).
   """
   print("==> Modo acotado al subdirectorio:")
   print(f"    origen : {origen_sub}/")
@@ -284,7 +281,7 @@ def aplicar_acotado(repo_root: Path, origen_repo: Path, commit: str, origen_sub:
   total = len([l for l in out("git", "diff", "--name-only", "--no-renames", base, commit, cwd=origen_repo).splitlines() if l])
   fuera = total - len(entradas)
   conflictos = 0
-  resumen = {"aplicados": 0, "agregados": 0, "eliminados": 0, "conflictos": 0, "atenciones": 0, "fuera": fuera}
+  resumen = {"aplicados": 0, "agregados": 0, "reemplazados": 0, "eliminados": 0, "conflictos": 0, "fuera": fuera}
 
   for status, path in entradas:
     rel = path[len(origen_sub) + 1:]
@@ -301,13 +298,11 @@ def aplicar_acotado(repo_root: Path, origen_repo: Path, commit: str, origen_sub:
       else:
         print(f"    Omiso (eliminado en el origen, no existía en destino): {destino}")
     elif status in ("A", "T"):
+      escribir_blob(origen_repo, repo_root, commit, path, destino)
       if existe_head:
-        guardar_desde_origen(origen_repo, repo_root, commit, path, destino)
-        resumen["atenciones"] += 1
-        print(f"    ATENCION: {path} -> {destino} ya existe en el destino.")
-        print(f"      Versión del origen en {destino}.desde_origen; revísala a mano.")
+        resumen["reemplazados"] += 1
+        print(f"    Reemplazado: {path} -> {destino} (nuevo en el origen, ya existía en el destino)")
       else:
-        escribir_blob(origen_repo, repo_root, commit, path, destino)
         resumen["agregados"] += 1
         print(f"    Agregado: {path} -> {destino}")
     else:  # M
@@ -330,10 +325,9 @@ def aplicar_acotado(repo_root: Path, origen_repo: Path, commit: str, origen_sub:
         conflictos += 1
         print(f"    CONFLICTO de contenido: {destino} (quedó como merge conflict).")
       else:
-        guardar_desde_origen(origen_repo, repo_root, commit, path, destino)
-        resumen["atenciones"] += 1
-        print(f"    ATENCION: {path} -> {destino} NO aplica limpio.")
-        print(f"      Revisa {destino}.desde_origen y decide.")
+        escribir_blob(origen_repo, repo_root, commit, path, destino)
+        resumen["reemplazados"] += 1
+        print(f"    Reemplazado: {path} -> {destino} (el diff del origen no aplicaba limpio)")
 
   resumen["conflictos"] = conflictos
   if fuera:

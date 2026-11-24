@@ -52,12 +52,12 @@ scss / css compilado:
     push); arregla el build, commitea con el mensaje sugerido y pushea.
 
 Conflictos de css compilado:
-  - Los conflictos o '.desde_origen' en assets/css/base/*.css se
-    auto-resuelven con la versión del ORIGEN (incoming): son artefactos
-    compilados, no código a conciliar. Si tras resolverlos no queda ningún
-    otro conflicto, el destino se commitea y pushea normal; si quedan
-    conflictos en otros archivos, ese destino queda PENDIENTE (con los css
-    ya resueltos y staged).
+  - Los conflictos (y eventuales restos '.desde_origen' de corridas antiguas)
+    en assets/css/base/*.css se auto-resuelven con la versión del ORIGEN
+    (incoming): son artefactos compilados, no código a conciliar. Si tras
+    resolverlos no queda ningún otro conflicto, el destino se commitea y
+    pushea normal; si quedan conflictos en otros archivos, ese destino queda
+    PENDIENTE (con los css ya resueltos y staged).
 
 Configuración en ~/.config/xtool/git-deploy.json (o la ruta de la variable
 de entorno GIT_DEPLOY_CONFIG):
