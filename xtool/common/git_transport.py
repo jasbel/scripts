@@ -260,7 +260,10 @@ def aplicar_acotado(repo_root: Path, origen_repo: Path, commit: str, origen_sub:
   <origen_sub>/ruta/archivo  ->  <destino_sub>/ruta/archivo
 
   Sin cherry-pick (sin detección de renombres): nada puede salir del
-  subdirectorio destino. Archivo por archivo con 'git apply -3'.
+  subdirectorio destino. Archivo por archivo: si el destino tiene la versión
+  base del commit de origen se aplica el diff ('git apply -3'); si divergió,
+  la versión del commit REEMPLAZA a la del destino (determinista: nunca un
+  merge silencioso cuyo resultado difiera del origen).
 
   Archivos ya existentes en el destino (vengan como nuevos o modificados en
   el origen): la versión del ORIGEN los REEMPLAZA y queda staged. La versión
@@ -320,6 +323,16 @@ def aplicar_acotado(repo_root: Path, origen_repo: Path, commit: str, origen_sub:
         resumen["agregados"] += 1
         print(f"    Agregado: {path} -> {destino}")
     else:  # M
+      # Divergencia destino/origen: si el destino ya no tiene la versión base
+      # del commit, 'git apply -3' haría un merge silencioso cuyo resultado
+      # puede diferir de la versión del origen. La versión del origen manda.
+      sha_base = out("git", "rev-parse", f"{base}:{path}", cwd=origen_repo).strip()
+      sha_dest = out("git", "rev-parse", f"HEAD:{destino}", cwd=repo_root).strip() if existe_head else ""
+      if sha_base and sha_dest and sha_base != sha_dest:
+        escribir_blob(origen_repo, repo_root, commit, path, destino)
+        resumen["reemplazados"] += 1
+        print(f"    Reemplazado: {path} -> {destino} (el destino divergió; manda la versión del origen)")
+        continue
       diff = out("git", "diff", "--binary", base, commit, "--", path, cwd=origen_repo)
       patch_file.write_text(diff)
       args = ["git", "apply", "-3", f"-p{strip_n}"]

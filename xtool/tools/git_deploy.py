@@ -23,7 +23,10 @@ Automatiza el flujo "ir a sc_clone, buscar el commit, cherry-pick, push":
        [pre] <subject original>            (commit individual)
        [pre] <subject más nuevo> (N commits)   (rango, aplastado)
      El cuerpo lista el/los commit(s) de origen ('Origen: <sha>') y se
-     conserva el autor original.
+     conserva el autor original. Si tras transportar (y compilar el css) no
+     queda nada en staging, el destino YA contenía los cambios: se informa
+     como AL DÍA, no se commitea ni pushea y no bloquea a los demás destinos
+     del mismo repo (despliegue repetido).
   6. Antes de pushear actualiza el destino con
      'git pull --rebase --autostash <remote> <rama activa>' (si la rama ya
      existe en el remote; si el rebase conflictúa se aborta y el destino
@@ -438,6 +441,13 @@ def desplegar(plan, commits, origen_repo, patch_file, msg_file, autor, no_push):
         print(f"      | {linea}")
       return "pendiente"
 
+  # Despliegue repetido: si tras transportar (y compilar css) no quedó nada
+  # en staging, el destino ya contiene estos cambios. Se da por desplegado
+  # sin commitear y SIN bloquear a los demás destinos del mismo repo.
+  if run("git", "diff", "--cached", "--quiet", cwd=plan["destino_repo"], check=False).returncode == 0:
+    print("==> AL DÍA: el destino ya contiene estos cambios; nada que commitear.")
+    return "al_dia"
+
   commit = run("git", "commit", "-F", str(msg_file), f"--author={autor}", cwd=plan["destino_repo"], check=False)
   if commit.returncode != 0:
     print("ERROR: no se pudo commitear en el destino:")
@@ -608,7 +618,7 @@ def main(argv=None):
         continue
       estado = desplegar(plan, commits, origen_repo, patch_file, msg_file, autor, no_push)
       resultados.append((plan, estado, None))
-      if estado != "ok":
+      if estado not in ("ok", "al_dia"):
         pendientes_repo.add(plan["destino_repo"])
   finally:
     patch_file.unlink(missing_ok=True)
@@ -621,6 +631,8 @@ def main(argv=None):
     nombre = plan["origen_sub"] or "(raíz)"
     if estado == "ok":
       print(f"  OK        {nombre} -> {mostrar_ruta(plan['destino'])} ({plan['rama_activa']})")
+    elif estado == "al_dia":
+      print(f"  AL DÍA    {nombre} -> {mostrar_ruta(plan['destino'])} (ya desplegado; sin cambios que commitear)")
     elif estado == "pendiente":
       print(f"  PENDIENTE {nombre} -> {mostrar_ruta(plan['destino'])} (revisar: conflictos o build de css; sin commit/push)")
       fallos += 1
