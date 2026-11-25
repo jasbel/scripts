@@ -18,7 +18,8 @@ symfony_chile):
   cr  -> symfony_costarica      mx -> symfony_mexico
   sc / home -> symfony_home     is / islas -> symfony_islasgriegas
   lu  -> symfony_lujo           me -> symfony_mediterraneo
-  all -> todos los symfony_* de las raíces configuradas (menos el origen)
+  all -> los destinos fijados con 'destinos' (menos el origen); sin
+         'destinos', todos los symfony_* de las raíces configuradas
 
 Los destinos se buscan como <raíz>/symfony_<app> en
 ~/.config/xtool/replicate.json (o la ruta de la variable de entorno
@@ -26,11 +27,27 @@ GIT_REPLICATE_CONFIG). Solo las raíces PRINCIPALES: los clones de
 preproducción (sc_clone, sc_clone_2, ...) siguen siendo territorio de
 'xtool git-deploy'.
 
+La clave opcional 'destinos' FIJA la ruta exacta de cada app (la clave es
+el nombre del app, p.ej. symfony_chile): el alias va siempre a esa ruta,
+sin ambigüedad aunque el app exista en varias raíces (p.ej.
+symfony_colombia en europa y latam), y 'all' replica exactamente esos
+destinos (menos el origen) en vez de barrer ambas raíces:
+
   {
     "raices": [
       "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web",
       "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web"
-    ]
+    ],
+    "destinos": {
+      "symfony_chile": "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web/symfony_chile",
+      "symfony_colombia": "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web/symfony_colombia",
+      "symfony_costarica": "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web/symfony_costarica",
+      "symfony_mexico": "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web/symfony_mexico",
+      "symfony_home": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_home",
+      "symfony_islasgriegas": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_islasgriegas",
+      "symfony_mediterraneo": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_mediterraneo",
+      "symfony_lujo": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_lujo"
+    }
   }
 
 Fuente de los cambios:
@@ -62,7 +79,7 @@ a mano.
 
 Ejemplos (parado en .../Web/symfony_home):
   xtool replicate cl me             # HEAD -> symfony_chile y symfony_mediterraneo
-  xtool replicate all --stash       # cambios sin commitear -> todas las apps (y al origen)
+  xtool replicate all --stash       # cambios sin commitear -> los destinos fijados (y al origen)
   xtool replicate cl me abc1234 -y  # ese commit, commitea y pushea en cada destino
 
 Código de salida: 0 si todos los destinos quedaron replicados, 1 si alguno
@@ -100,7 +117,7 @@ ALIAS = {
   "cr": "symfony_costarica", "costarica": "symfony_costarica", "symfony_costarica": "symfony_costarica",
   "mx": "symfony_mexico", "mexico": "symfony_mexico", "symfony_mexico": "symfony_mexico",
   "sc": "symfony_home", "home": "symfony_home", "symfony_home": "symfony_home",
-  "is": "symfony_islasgriegas", "islas": "symfony_islasgriegas", "symfony_islasgriegas": "symfony_islasgriegas",
+  "is": "symfony_islasgriegas","ig": "symfony_islasgriegas", "islas": "symfony_islasgriegas", "symfony_islasgriegas": "symfony_islasgriegas",
   "lu": "symfony_lujo", "lujo": "symfony_lujo", "symfony_lujo": "symfony_lujo",
   "me": "symfony_mediterraneo", "mediterraneo": "symfony_mediterraneo", "symfony_mediterraneo": "symfony_mediterraneo",
 }
@@ -109,7 +126,17 @@ EJEMPLO_CONFIG = """{
   "raices": [
     "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web",
     "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web"
-  ]
+  ],
+  "destinos": {
+    "symfony_chile": "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web/symfony_chile",
+    "symfony_colombia": "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web/symfony_colombia",
+    "symfony_costarica": "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web/symfony_costarica",
+    "symfony_mexico": "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web/symfony_mexico",
+    "symfony_home": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_home",
+    "symfony_islasgriegas": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_islasgriegas",
+    "symfony_mediterraneo": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_mediterraneo",
+    "symfony_lujo": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_lujo"
+  }
 }"""
 
 USO = "Uso: xtool replicate <alias...> [commit] [--stash] [-y] [--yes] [--no-force]"
@@ -125,30 +152,45 @@ def _porcelain(repo: Path):
   return [l for l in out("git", "status", "--porcelain", cwd=repo).splitlines() if l.strip()]
 
 
-def cargar_raices():
-  """Lee la configuración JSON. Devuelve la lista de raíces o None si falla."""
+def cargar_config():
+  """Lee la configuración JSON. Devuelve (raíces, destinos) o (None, None).
+
+  raíces: lista de Web principales donde buscar <raíz>/symfony_<app>.
+  destinos: mapeo opcional app -> ruta exacta que fija cada alias y el
+  alcance de 'all' (dict vacío si la clave no existe).
+  """
   ruta = Path(os.environ.get(ENV_CONFIG, "") or CONFIG_DEFAULT)
   if not ruta.is_file():
     print(f"ERROR: no existe la configuración {mostrar_ruta(ruta)}")
     print("Crea el archivo con tus raíces (los Web principales; los clones de pre van con git-deploy):")
     print(EJEMPLO_CONFIG)
-    return None
+    return None, None
   try:
     datos = json.loads(ruta.read_text(encoding="utf-8"))
   except (json.JSONDecodeError, OSError) as e:
     print(f"ERROR: no se pudo leer {ruta}: {e}")
-    return None
+    return None, None
   raices_raw = datos.get("raices") if isinstance(datos, dict) else None
   if not isinstance(raices_raw, list) or not raices_raw:
     print(f"ERROR: {ruta} debe tener una lista no vacía bajo la clave 'raices'")
-    return None
+    return None, None
   raices = []
   for r in raices_raw:
     if not isinstance(r, str) or not r.strip():
       print(f"ERROR: raíz inválida en {ruta}: {r!r}")
-      return None
+      return None, None
     raices.append(Path(r.strip()).expanduser().resolve())
-  return raices
+  destinos_raw = datos.get("destinos", {}) if isinstance(datos, dict) else {}
+  if not isinstance(destinos_raw, dict):
+    print(f"ERROR: 'destinos' en {ruta} debe ser un objeto app -> ruta")
+    return None, None
+  destinos = {}
+  for app, r in destinos_raw.items():
+    if not isinstance(r, str) or not r.strip():
+      print(f"ERROR: destino inválido para {app!r} en {ruta}: {r!r}")
+      return None, None
+    destinos[app] = Path(r.strip()).expanduser().resolve()
+  return raices, destinos
 
 
 def resolver_commit(origen_repo: Path, commit_arg, stash: bool):
@@ -204,13 +246,16 @@ def resolver_commit(origen_repo: Path, commit_arg, stash: bool):
   return (sha, "HEAD (commit actual)") if sha else (None, None)
 
 
-def resolver_targets(targets, raices, origen_dir: Path):
+def resolver_targets(targets, raices, origen_dir: Path, destinos):
   """Resuelve los tokens de destino en directorios concretos.
 
   Devuelve (pedidos, errores): pedidos = [(alias, app, destino)] sin
   duplicados y sin el origen; errores = mensajes por token sin resolución.
-  Ante ambigüedad (el app existe en varias raíces) se prefiere el hermano
-  del mismo Web del origen y se avisa.
+
+  Con 'destinos' en la configuración cada alias y 'all' van SIEMPRE a la
+  ruta fijada (no se barre ninguna raíz). Sin 'destinos', 'all' barre los
+  symfony_* de las raíces y ante ambigüedad (el app existe en varias
+  raíces) se prefiere el hermano del mismo Web del origen y se avisa.
   """
   pedidos, errores = [], []
   vistos = set()
@@ -226,14 +271,34 @@ def resolver_targets(targets, raices, origen_dir: Path):
 
   for t in targets:
     if t == "all":
-      for raiz in raices:
-        if not raiz.is_dir():
-          continue
-        for sub in sorted(raiz.iterdir()):
-          if sub.is_dir() and sub.name.startswith("symfony_"):
-            agregar(t, sub.name, sub)
+      if destinos:
+        for app in sorted(destinos):
+          destino = destinos[app]
+          if destino == origen_dir:
+            continue
+          if not destino.is_dir():
+            print(f"AVISO: {app} fijado en 'destinos' no existe: {mostrar_ruta(destino)}")
+            continue
+          agregar(t, app, destino)
+      else:
+        for raiz in raices:
+          if not raiz.is_dir():
+            continue
+          for sub in sorted(raiz.iterdir()):
+            if sub.is_dir() and sub.name.startswith("symfony_"):
+              agregar(t, sub.name, sub)
     else:
       app = ALIAS[t]
+      if app in destinos:
+        destino = destinos[app]
+        if destino == origen_dir:
+          errores.append(f"{t}: {app} es el directorio de origen")
+          continue
+        if not destino.is_dir():
+          errores.append(f"{t}: {app} fijado en 'destinos' no existe: {mostrar_ruta(destino)}")
+          continue
+        agregar(t, app, destino)
+        continue
       candidatos = [raiz / app for raiz in raices if (raiz / app).is_dir()]
       candidatos = [c for c in candidatos if c != origen_dir]
       if not candidatos:
@@ -407,7 +472,7 @@ def main(argv=None):
   rama_origen = out("git", "branch", "--show-current", cwd=origen_repo).strip() or "(detached)"
   print(f"==> Origen: {origen_sub} en {mostrar_ruta(origen_repo)} (rama: {rama_origen})")
 
-  raices = cargar_raices()
+  raices, destinos = cargar_config()
   if raices is None:
     return 1
   for raiz in raices:
@@ -422,7 +487,7 @@ def main(argv=None):
   print(f"==> Commit a replicar: {oneline} (fuente: {fuente})")
 
   # --- Destinos: resolver aliases y validar ---
-  pedidos, errores_res = resolver_targets(targets, raices, origen_dir)
+  pedidos, errores_res = resolver_targets(targets, raices, origen_dir, destinos)
   for e in errores_res:
     print(f"ERROR: {e}")
   if not pedidos:

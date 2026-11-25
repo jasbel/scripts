@@ -104,7 +104,7 @@ case $state in
         if [[ $state == aliases ]]; then
           local -a aliases
           aliases=(
-            'all:todos los apps menos el origen'
+            'all:los destinos fijados en la configuración (menos el origen)'
             'cl:symfony_chile'
             'co:symfony_colombia'
             'cr:symfony_costarica'

@@ -371,12 +371,14 @@ remotos).
 cd ~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_home
 xtool replicate cl me             # HEAD -> symfony_chile y symfony_mediterraneo
 xtool replicate cl me abc1234     # ese commit concreto
-xtool replicate all --stash       # cambios sin commitear -> todas las apps (y al origen)
+xtool replicate all --stash       # cambios sin commitear -> los 8 destinos fijados (y al origen)
 xtool replicate cl me -y          # además commitea+pushea cada destino con git-diff -y
 ```
 
 Aliases de destino: `cl co cr mx home is lu me` (también el nombre
-completo, p.ej. `symfony_chile`) y `all` (todos menos el origen).
+completo, p.ej. `symfony_chile`) y `all` (los destinos fijados menos el
+origen). Con la clave `destinos` en la configuración cada alias y `all`
+van SIEMPRE a su ruta fijada — nunca a un homónimo del otro árbol.
 
 - **`--stash`**: replica los cambios sin commitear del origen, untracked
   incluido: crea `git stash push -u`, captura el SHA, lo aplica de vuelta
@@ -409,6 +411,31 @@ preproducción siguen siendo territorio de `git-deploy`:
     "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web",
     "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web"
   ]
+}
+```
+
+La clave opcional `destinos` fija la ruta exacta de cada app (la clave es
+el nombre del app): cada alias va siempre a esa ruta y `all` replica
+exactamente esos destinos, menos el origen. Sin ella, `all` barre todos
+los `symfony_*` de las raíces y ante ambigüedad (mismo app en europa y
+latam) se prefiere el hermano del Web del origen:
+
+```json
+{
+  "raices": [
+    "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web",
+    "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web"
+  ],
+  "destinos": {
+    "symfony_chile": "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web/symfony_chile",
+    "symfony_colombia": "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web/symfony_colombia",
+    "symfony_costarica": "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web/symfony_costarica",
+    "symfony_mexico": "~/projects/symfony-sites/sites/solocruceros_latam/solocruceros.com/DDD/1_Presentation/Web/symfony_mexico",
+    "symfony_home": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_home",
+    "symfony_islasgriegas": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_islasgriegas",
+    "symfony_mediterraneo": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_mediterraneo",
+    "symfony_lujo": "~/projects/symfony-sites/sites/solocruceros.com/DDD/1_Presentation/Web/symfony_lujo"
+  }
 }
 ```
 
