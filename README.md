@@ -547,10 +547,11 @@ xtool pdf2doc a.pdf b.pdf c.pdf    # varios a la vez
 
 ## images
 
-`xtool images` optimiza imágenes (JPG, PNG, WebP) para web con las
+`xtool images` optimiza imágenes (JPG, PNG, WebP, SVG) para web con las
 herramientas nativas del sistema (imagemagick, jpegoptim, pngquant, oxipng,
 cwebp). La original nunca se modifica: la salida se crea junto a ella con
-sufijo `-opt` (`foto.jpg` → `foto-opt.jpg`; con escala `foto-2x-opt.jpg`).
+sufijo `-opt` (`foto.jpg` → `foto-opt.jpg`; con escala `foto-2x-opt.jpg`;
+con ancho fijo `foto-800w-opt.jpg`).
 Si faltan herramientas, ofrece instalarlas (brew, o `sudo apt` como fallback).
 
 ```bash
@@ -559,9 +560,23 @@ xtool images                            # busca en el directorio actual, lista y
 xtool images --2x header.png            # escala 200% (retina) y luego optimiza
 xtool images --1.5x --to-webp logo.png  # 150% convertido a WebP
 xtool images --dry                      # solo listar qué se haría
+xtool images --info logo.svg            # proporción y medidas sugeridas
+xtool images -w 512 logo.svg            # SVG → PNG de 512 de ancho (alto proporcional)
+xtool images -H 64 --to-webp icono.svg  # 64 de alto, ancho proporcional, en WebP
 ```
 
 - `--2x` / `--1.5x` / `--scale N`: escalar antes de optimizar.
+- `-w N` / `-H N`: ancho o alto final en px; la otra medida se calcula
+  manteniendo la proporción. Con ambos, encaja dentro de `NxM` sin deformar.
+  Funciona con cualquier formato (no se combina con `--scale`).
+- **SVG**: se rasteriza a PNG (o WebP con `--to-webp`) al tamaño pedido; sin
+  tamaño usa el intrínseco (`width`/`height` o `viewBox`). Requiere
+  `rsvg-convert` (brew `librsvg` / apt `librsvg2-bin`; se ofrece instalarlo):
+  el renderizador interno de ImageMagick falla con SVG reales. Los SVG con
+  `<foreignObject>` (ej. diagramas de Mermaid, textos en HTML) se renderizan
+  con Chrome/Chromium headless.
+- `--info`: solo muestra dimensiones, proporción, fórmulas (`alto = ancho × k`)
+  y, en SVG, medidas sugeridas (1x/1.5x/2x/3x, anchos y altos comunes).
 - `-q N`: calidad JPG/WebP (default 82); `--lossless` optimiza sin pérdida.
 - `--to-webp`: salida convertida a WebP; `--force` sobrescribe `-opt` existentes;
   `--yes` no pide confirmaciones.

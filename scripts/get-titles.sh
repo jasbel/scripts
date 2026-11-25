@@ -10,13 +10,14 @@
 # ]
 #
 # Uso:
-#   /home/asbel/projects/scripts/scripts/get-titles.sh                                              # local (BASE_URL por defecto)
+#   /home/asbel/projects/scripts/scripts/get-titles.sh                                              # local (BASE_URL por defecto, lista PAGES)
+#   /home/asbel/projects/scripts/scripts/get-titles.sh --pages ig                                  # local, lista PAGES_IG
 #   /home/asbel/projects/scripts/scripts/get-titles.sh https://sbox-mediterraneo.solocruceros.com   # pre
 #   BASE_URL="https://..." /home/asbel/projects/scripts/scripts/get-titles.sh                       # por variable de entorno
 #   /home/asbel/projects/scripts/scripts/get-titles.sh > titles.json                                # guardar a fichero
-#   /home/asbel/projects/scripts/scripts/get-titles.sh https://sbox-mediterraneo.solocruceros.com   > /home/asbel/Desktop/titles.json
+#   /home/asbel/projects/scripts/scripts/get-titles.sh https://sbox-mediterraneo.solocruceros.com --pages ig > /home/asbel/Desktop/titles.json
 #
-# Añadir páginas: editar la lista PAGES de abajo.
+# Añadir páginas: editar la lista PAGES (o PAGES_IG) de abajo.
 #   "Nombre|/ruta-relativa"        → se antepone BASE_URL
 #   "Nombre|https://url-completa"  → se usa tal cual (ignora BASE_URL)
 #
@@ -51,12 +52,30 @@
 
 set -uo pipefail
 
+# ─── Argumentos ─────────────────────────────────────────────────────────
+#   --pages ig     → usa la lista PAGES_IG
+#   --pages=ig     → ídem (forma compacta)
+# El resto de argumentos posicionales se tratan como siempre (BASE_URL).
+PAGES_SET="default"
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --pages)
+      [[ $# -ge 2 ]] || { printf 'ERROR: --pages necesita un valor (p. ej. ig)\n' >&2; exit 1; }
+      PAGES_SET="$2"; shift 2 ;;
+    --pages=*)
+      PAGES_SET="${1#--pages=}"; shift ;;
+    *)
+      POSITIONAL+=("$1"); shift ;;
+  esac
+done
+
 # ─── Configuración ──────────────────────────────────────────────────────
 # URL base por defecto (entorno local). Se puede sobrescribir:
-#   1) pasándola como primer argumento  (máxima prioridad)
+#   1) pasándola como primer argumento posicional  (máxima prioridad)
 #   2) con la variable de entorno BASE_URL
 BASE_URL="${BASE_URL:-http://scme.local}"
-BASE_URL="${1:-$BASE_URL}"
+BASE_URL="${POSITIONAL[0]:-$BASE_URL}"
 BASE_URL="${BASE_URL%/}"   # quita la barra final si la lleva
 
 
@@ -78,6 +97,36 @@ PAGES=(
   "Navidad y Fin|/cruceros-navidad-y-fin-de-ano"
   "Cruceros Seman|/cruceros-semana-santa"
 )
+PAGES_IG=(
+  "Cruceros Familias|/cruceros-familias"
+  "Cruceros Baratos|/cruceros-baratos"
+  "Cruceros Premium|/cruceros-premium"
+  "Cruceros de Lujo|/cruceros-de-lujo"
+  "Cruceros Novios|/cruceros-novios"
+  "Cruceros Todo Incluido|/cruceros-todo-incluido"
+  "Minicruceros|/minicruceros"
+  "Última hora|/ultima-hora"
+  "Primavera|/primavera"
+  "Verano|/verano"
+  "Otoño|/otono"
+  "Invierno|/invierno"
+  "Navidad y Fin de Año|/cruceros-navidad-y-fin-de-ano"
+  "Cruceros Semana Santa|/semana-santa"
+  "Cruceros 2026|/cruceros-2026"
+  "Cruceros 2027|/cruceros-2027"
+  "Cruceros 2028|/cruceros-2028"
+)
+
+# ─── Selección de lista de páginas (--pages) ─────────────────────────────
+# default → PAGES (la de siempre) · ig → PAGES_IG
+case "$PAGES_SET" in
+  ig)      PAGES=("${PAGES_IG[@]}") ;;
+  default) ;;   # PAGES tal cual
+  *)
+    printf 'ERROR: valor de --pages no reconocido: "%s" (disponibles: default, ig)\n' "$PAGES_SET" >&2
+    exit 1
+    ;;
+esac
 
 # ─── Interno (no hace falta tocar) ──────────────────────────────────────
 CURL_OPTS=(-sL --compressed --max-time 15 -A "get-titles.sh/1.0")
