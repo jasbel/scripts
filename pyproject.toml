@@ -8,6 +8,7 @@ dependencies = [
     "zai-sdk>=0.2.3",
     "psutil>=6.0.0",
     "requests>=2.32",
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]

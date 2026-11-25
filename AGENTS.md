@@ -21,7 +21,7 @@ Personal global CLI toolkit distributed as the `xtool` command (`uv tool install
 
 ## Conventions
 
-- Python 3.12, uv-managed, hatchling build. Deps: `zai-sdk` (AI for git-diff), `psutil`.
+- Python 3.12, uv-managed, hatchling build. Deps: `zai-sdk` (AI for git-diff), `psutil`, `requests`, `pyyaml` (titles).
 - 2-space indent in Python (not PEP8's 4) — match existing files.
 - Docstrings, help text, and user-facing messages are in Spanish.
 - Commit messages follow Conventional Commits (there's even an `xtool git-diff` tool that generates them from the staged diff).

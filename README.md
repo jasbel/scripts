@@ -113,6 +113,43 @@ xtool emails extract        # extrae datos del HTML de referencia a data.json
 Configuración del proyecto (rutas de templates, SMTP para envíos de prueba)
 en `xtool/emails/.env` — ver `xtool/emails/.env.example`.
 
+## titles
+
+`xtool titles` recupera el `<title>` de una lista de páginas (en paralelo) y
+detecta cambios entre corridas. Sustituye a `scripts/get-titles.sh`.
+
+```bash
+# rutas por parámetro (base_url + rutas; "Nombre|/ruta" para fijar el nombre)
+xtool titles https://www.solocruceros.com /minicruceros /cruceros-desde-malaga
+
+# listas guardadas en YAML (~/.config/xtool/titles.yaml)
+xtool titles --init                  # crea el YAML de ejemplo
+xtool titles --list                  # sets configurados
+xtool titles --set ig                # revisa el set 'ig'
+xtool titles --set ig https://sbox-mediterraneo.solocruceros.com  # otra base_url
+
+# verificar cambios
+xtool titles --set desde --track     # compara con la corrida anterior y la guarda
+xtool titles --set ig -o titles.json # guarda JSON
+xtool titles --set ig --compare titles.json
+```
+
+Formato del YAML (ruta alternativa con `-c` o `XTOOL_TITLES_CONFIG`):
+
+```yaml
+default: desde
+sets:
+  desde:
+    base_url: https://www.solocruceros.com
+    rutas:
+      - /minicruceros
+      - Málaga|/cruceros-desde-malaga
+      - {name: Miami, path: /cruceros-desde-miami}
+```
+
+Con `--track`/`--compare` sale con código 1 si algún título cambió. Las
+referencias de `--track` se guardan en `~/.local/state/xtool/titles/`.
+
 ## git-diff
 
 `xtool git-diff` genera un mensaje de commit Conventional Commits en español
