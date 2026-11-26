@@ -749,25 +749,61 @@ def avisos_rama(rama):
   return []
 
 
+_COLOR = None
+
+
+def _usar_color():
+  """True si la salida admite colores ANSI (TTY y sin NO_COLOR)."""
+  global _COLOR
+  if _COLOR is None:
+    _COLOR = bool(sys.stdout.isatty() and not os.environ.get("NO_COLOR"))
+    if _COLOR and platform.system() == "Windows":
+      os.system("")  # activa las secuencias ANSI en la consola clásica de Windows
+  return _COLOR
+
+
+def _estilo(texto, *codigos):
+  """Envuelve el texto en códigos ANSI (1=negrita, 2=tenue, 31=rojo, 33=amarillo, 36=cian...)."""
+  if not codigos or not _usar_color():
+    return texto
+  return f"\033[{';'.join(str(c) for c in codigos)}m{texto}\033[0m"
+
+
 def mostrar_avisos_rama(rama, avisos, commit, issue_id):
   """Imprime los avisos de rama con la propuesta de renombrado."""
   if not avisos:
     return
   sugerida = sugerir_rama(commit, issue_id)
-  print("=" * 60)
-  print("AVISO: la rama no cumple la convención del equipo")
+  protegida = rama in PROTECTED_BRANCHES
+  # Rojo si es rama protegida (más grave), amarillo en el resto
+  color = 31 if protegida else 33
+  ancho = 64
+  barra = _estilo("│", color)
+  titulo = " ⚠  AVISO: LA RAMA NO CUMPLE LA CONVENCIÓN DEL EQUIPO "
+
+  print()
+  print(_estilo("╭─" + titulo + "─" * max(ancho - len(titulo) - 2, 0), color, 1))
+  print(barra)
   for a in avisos:
-    print(f"  - {a}")
-  print(f"  Nombre propuesto: {sugerida}")
-  if rama in PROTECTED_BRANCHES:
-    print(f"  Crea una rama desde la base y trabaja ahí: git switch -c {sugerida}")
+    print(f"{barra}  {_estilo('✗', color, 1)} {a}")
+  print(barra)
+  print(f"{barra}  {_estilo('Rama actual:     ', 2)} {_estilo(rama, color)}")
+  print(f"{barra}  {_estilo('Nombre propuesto:', 2)} {_estilo(sugerida, 32, 1)}")
+  if protegida:
+    print(f"{barra}  {_estilo('Crea una rama:   ', 2)} {_estilo(f'git switch -c {sugerida}', 36, 1)}")
+    print(f"{barra}  {_estilo('(desde la base y trabaja ahí)', 2)}")
   else:
-    print(f"  Renómbrala con:   git branch -m {sugerida}")
+    print(f"{barra}  {_estilo('Renómbrala con:  ', 2)} {_estilo(f'git branch -m {sugerida}', 36, 1)}")
     if upstream_actual():
-      print(f"  (ya está en remoto: tras renombrar, 'git push -u origin {sugerida}' y borra la antigua si procede)")
+      print(barra)
+      print(f"{barra}  {_estilo('Ya está en remoto: tras renombrar, publica la nueva y borra la antigua si procede:', 2)}")
+      print(f"{barra}  {_estilo('                  ', 2)} {_estilo(f'git push -u origin {sugerida}', 36, 1)}")
   if "<id>" in sugerida:
-    print("  Sustituye <id> por el ID de la tarea de Odoo")
-  print("=" * 60)
+    print(barra)
+    print(f"{barra}  {_estilo('💡 Sustituye', 1)} {_estilo('<id>', 35, 1)} {_estilo('por el ID de la tarea de Odoo', 1)}")
+  print(barra)
+  print(_estilo("╰" + "─" * (ancho - 1), color, 1))
+  print()
 
 
 def titulo_mr(commit, issue_id):
