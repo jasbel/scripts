@@ -4,7 +4,6 @@
 Uso:
   xtool git-diff
   xtool git-diff --commit <id>
-  xtool git-diff --with-types
   xtool git-diff --commit-push
   xtool git-diff -y            # forma corta de --commit-push
   xtool git-diff --include-excluded   # incluye json, yaml, .gitignore, test.py
@@ -27,11 +26,27 @@ Con --include-excluded (o -a) se incluyen; útil cuando el staged solo toca
 esos archivos. El filtrado de lockfiles, binarios y generados se mantiene,
 salvo que deje el diff vacío (entonces se analiza todo).
 
-Si la rama actual lleva un ID numérico (feat-123, issue/45, hotfix-789, ...)
-se antepone [123] al commit generado.
+Convención del equipo (ramas y commits en inglés, minúsculas, números y '-'):
+  commit: <tipo>(<ámbito>): <descripción>
+          tipos: feat|fix|security|refactor|perf|test|docs|build|ci|chore|style
+          descripción en imperativo (add, fix, remove), empieza en minúscula,
+          sin punto final y cabecera de menos de 72 caracteres. Solo la
+          cabecera va en inglés: de la tercera línea al final van bullets
+          '* ' en español (voz pasiva), como antes.
+  rama:   <tipo>/issue-<id>/<descripcion-corta>
+          tipos: feature|fix|hotfix|refactor|security|docs|test|chore
+          p. ej. fix/issue-45315/newsletter-spam-validation
 
-Por defecto los bullets terminan solo con punto; con --with-types cada bullet
-añade su alcance entre paréntesis, p. ej. (gui), (api).
+Si la rama lleva el ID de la tarea el commit termina con 'Refs: #<id>' y se
+sugiere el título del merge request ([FIX] #45315 - Validate ...). El ID se
+saca también de ramas viejas que no siguen la convención: prefijo conocido
+(feat-123, issue/45, hotfix-789, feature_1012, ...) o, si no, cualquier
+número de 3+ dígitos como segmento (feature/login-45315, 45315-newsletter).
+
+Se valida la rama actual: si no sigue la convención, es genérica (changes,
+fixes, test, update...) o es protegida (main, master, production) se avisa
+y se propone un nombre con el comando 'git branch -m' para renombrarla.
+Es solo un aviso: no bloquea el commit ni el push de -y.
 
 Con --commit-push (o su forma corta -y), además de generar el mensaje se
 commitea el diff staged
@@ -63,6 +78,7 @@ import sys
 import tempfile
 import threading
 import time
+import unicodedata
 from typing import Any, Dict, List, Optional, cast
 
 from zai import ZaiClient
@@ -119,38 +135,50 @@ PRICING_USD_PER_1M = {
   "glm-5.2": {"input": 1.4, "output": 4.4},
 }
 
-VALID_TYPES = ["feat", "fix", "refactor", "style", "docs", "test", "chore", "perf", "ci", "build"]
-VALID_SCOPES = ["template", "css", "gui", "web", "api", "common", "db", "auth", "core", "test", "utils", "models", "scripts", "ci"]
+VALID_TYPES = ["feat", "fix", "security", "refactor", "perf", "test", "docs", "build", "ci", "chore", "style"]
+BRANCH_TYPES = ["feature", "fix", "hotfix", "refactor", "security", "docs", "test", "chore"]
+PROTECTED_BRANCHES = {"main", "master", "production"}
+GENERIC_WORDS = {"changes", "change", "fixes", "fix", "test", "tests", "update", "updates", "wip", "misc", "temp", "tmp", "final"}
+# Tipo de commit -> tipo de rama sugerido
+COMMIT_TO_BRANCH_TYPE = {
+  "feat": "feature", "fix": "fix", "security": "security", "refactor": "refactor", "perf": "refactor",
+  "test": "test", "docs": "docs", "build": "chore", "ci": "chore", "chore": "chore", "style": "chore",
+}
+HEADER_MAX = 72
+HEADER_RE = re.compile(rf"^({'|'.join(VALID_TYPES)})\(([a-z0-9]+(?:[-/][a-z0-9]+)*)\): (\S.*)$")
 
-SYSTEM_PROMPT_TMPL = """
-Genera un mensaje de commit Conventional Commits en español.
+SYSTEM_PROMPT = """
+Genera un mensaje de commit Conventional Commits a partir del diff.
 
-Responde únicamente con el commit, sin explicaciones ni bloques de código.
+Responde únicamente con el commit, sin explicaciones, sin bloques de código ni comillas.
 
 Formato:
 
-[tipo]: <Título>.
+<type>(<scope>): <description>
 
-* <Descripción>{suf_scope}
+* <Descripción en español>.
 
----
+Reglas de la PRIMERA LÍNEA (cabecera), SIEMPRE EN INGLÉS:
+- type: feat|fix|security|refactor|perf|test|docs|build|ci|chore|style
+- scope: módulo/área tocada, solo minúsculas, números y "-" (p. ej. mailchimp, api, git-diff).
+- description: en inglés, modo imperativo (add, fix, remove, validate...), empieza en minúscula,
+  sin punto final, sin acentos; la línea completa debe tener menos de 72 caracteres.
+  Sé específico; nunca "changes", "fixes", "update", "wip", "final" ni "fix bug".
+  Ejemplo: fix(mailchimp): validate newsletter subscription requests
 
-Reglas:
-- Tipos: feat|fix|refactor|style|docs|test|chore|perf|ci|build
-- Título: español, inicia con mayúscula, voz pasiva ("Se + pretérito"), máximo 150 caracteres y termina con punto.
-- Descripciones: una o más líneas con "* ", voz pasiva ("Se + pretérito"){regla_scope}
-- Deja una línea en blanco entre el título y las descripciones.
-- No inventes cambios; resume solo los detectados.
-- Ignora cambios de archivos .json, .yml .gitignore.
+Reglas de la DESCRIPCIÓN (de la tercera línea al final), SIEMPRE EN ESPAÑOL:
+- Deja una línea en blanco entre la cabecera y las descripciones.
+- Una o más líneas (máximo 7) que empiezan con "* ", en español, voz pasiva ("Se + pretérito"),
+  empiezan con mayúscula y terminan con punto. Explica qué problema había, la causa y la solución
+  cuando aplique.
+
+Reglas generales:
+- Nunca incluyas nombres de personas, credenciales, emails ni datos de clientes.
+- No añadas footers "Refs:", "Closes" ni "Fixes"; se agregan automáticamente.
+- Describe un único cambio lógico; no inventes cambios, resume solo lo detectado en el diff.
+- Ignora cambios de archivos .json, .yml y .gitignore.
 """
 
-
-def build_system_prompt(with_types=False):
-  """Prompt del sistema; con with_types cada bullet termina con su alcance (gui, api...)."""
-  return SYSTEM_PROMPT_TMPL.format(
-    suf_scope=". (<alcance>)" if with_types else ".",
-    regla_scope=', terminan con ". (<alcance>)".\n- Alcances: gui|api|common|db|auth|core|test' if with_types else ", terminan con punto",
-  )
 
 # Nivel de razonamiento del modelo: low | high | max (la API usa max por defecto)
 MODEL_VARIANT = "low"
@@ -185,8 +213,17 @@ ORIGINAL_EXCLUDES = [
   ":(exclude)*/test.py",
 ]
 
-# Rama con ID numérico: feat-123, issue/45, hotfix-789, dev-101, feature_1012, ...
-BRANCH_ID_RE = re.compile(r"^(?:feat|feature|issue|fix|bug|hotfix|task|story|dev|pre)[/_-](\d+)")
+# Rama según la convención: <tipo>/issue-<id>/<descripcion-corta>
+BRANCH_RE = re.compile(rf"^({'|'.join(BRANCH_TYPES)})/issue-(\d+)/([a-z0-9]+(?:-[a-z0-9]+)*)$")
+# Ramas viejas (no siguen la convención) de las que aún hay que sacar el ID de la tarea:
+# 1) prefijo conocido + ID: feat-123, issue/45, hotfix-789, dev-101, feature_1012, fix/issue-77...
+BRANCH_ID_RE = re.compile(
+  r"^(?:feat|feature|issue|fix|bug|bugfix|hotfix|task|story|dev|pre|refactor|security|docs|test|chore)[/_-](?:issue[/_-]?)?#?(\d+)",
+  re.I,
+)
+# 2) respaldo: cualquier número de 3+ dígitos como segmento de la rama
+#    (feature/login-45315, 45315-newsletter, odoo/45315/fix-x, ...)
+BRANCH_ID_FALLBACK_RE = re.compile(r"(?:^|[/_#-])(\d{3,})(?=$|[/_-])")
 
 BASE_EXCLUDE_PATTERNS = [
   r"\.lock$",
@@ -615,68 +652,150 @@ def parse_response(respuesta):
   return commit, summary
 
 
-def get_issue_id():
-  """Devuelve el ID numérico de la rama actual (feat-123, issue/45, ...) o None."""
-  try:
-    proc = subprocess.run(
-      ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-      capture_output=True,
-      text=True,
-      encoding="utf-8",
-      errors="replace",
-      timeout=10,
-    )
-  except Exception:
+def issue_id_de_rama(rama):
+  """Devuelve el ID de la tarea de la rama (fix/issue-45315/..., feat-123, ...) o None."""
+  if not rama:
     return None
-  if proc.returncode != 0:
+  m = BRANCH_RE.match(rama)
+  if m:
+    return m.group(2)
+  m = BRANCH_ID_RE.match(rama)
+  if m:
+    return m.group(1)
+  # El respaldo no aplica a ramas de release ni a números que son fechas (2024-01)
+  if re.match(r"^(?:release|releases|version|v\d)", rama, re.I):
     return None
-  branch = proc.stdout.strip()
-  match = BRANCH_ID_RE.match(branch)
-  return match.group(1) if match else None
+  for m in BRANCH_ID_FALLBACK_RE.finditer(rama):
+    if not re.match(r"(?:19|20)\d{2}[-_]\d{2}", rama[m.start(1):]):
+      return m.group(1)
+  return None
 
 
-def add_issue_prefix(commit, issue_id):
-  """Antepone [ID] al commit si la rama lleva un ID numérico y aún no está."""
+def normalizar_commit(commit):
+  """Ajusta detalles mecánicos de la salida del modelo a la convención.
+
+  Quita bloques de código y footers Refs/Closes/Fixes (se añaden aparte),
+  pone en minúscula el inicio de la descripción y elimina el punto final
+  de la cabecera.
+  """
+  text = re.sub(r"^```[a-z]*\s*|\s*```$", "", commit.strip()).strip()
+  lines = [li.rstrip() for li in text.split("\n")]
+  lines = [li for li in lines if not re.match(r"^(Refs|Closes|Fixes):\s*#", li, re.I)]
+  if lines:
+    header = lines[0].strip().rstrip(".")
+    m = re.match(r"^([^:]+:\s*)(.*)$", header)
+    if m and m.group(2)[:1].isupper() and not m.group(2)[:2].isupper():
+      header = m.group(1) + m.group(2)[0].lower() + m.group(2)[1:]
+    lines[0] = header
+  return "\n".join(lines).strip()
+
+
+def add_refs(commit, issue_id):
+  """Añade el footer 'Refs: #<id>' al final del commit si hay ID de tarea."""
   if not issue_id:
     return commit
-  tag = f"[{issue_id}]"
-  if tag in commit:
-    return commit
-  return f"{tag} {commit}"
+  return f"{commit}\n\nRefs: #{issue_id}"
 
 
-def score_quality(output, with_types=False):
-  checks = []
+def errores_cabecera(header):
+  """Lista de incumplimientos de la convención en la cabecera del commit."""
+  errores = []
+  m = HEADER_RE.match(header)
+  if not m:
+    errores.append("no sigue '<tipo>(<ámbito>): <descripción>' con un tipo válido")
+    return errores
+  desc = m.group(3)
+  if len(header) >= HEADER_MAX:
+    errores.append(f"la cabecera tiene {len(header)} caracteres (debe ser < {HEADER_MAX})")
+  if desc[:1].isupper():
+    errores.append("la descripción debe empezar en minúscula")
+  if desc.endswith("."):
+    errores.append("la descripción no debe terminar en punto")
+  if not header.isascii():
+    errores.append("contiene caracteres no ASCII (acentos, eñes...)")
+  if desc.strip().lower() in {"wip", "final", "fix bug", "changes", "fixes", "update", "test"}:
+    errores.append("descripción genérica")
+  return errores
+
+
+def _slug(texto, max_palabras=4):
+  """Convierte un texto a kebab-case ASCII (para sugerir nombres de rama)."""
+  ascii_txt = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode().lower()
+  stop = {"a", "an", "the", "to", "for", "of", "and", "in", "on", "with", "from", "by", "when", "into"}
+  palabras = [w for w in re.split(r"[^a-z0-9]+", ascii_txt) if w and w not in stop]
+  return "-".join(palabras[:max_palabras])
+
+
+def sugerir_rama(commit, issue_id):
+  """Propone '<tipo>/issue-<id>/<descripcion-corta>' a partir del commit generado."""
+  m = HEADER_RE.match(commit.split("\n", 1)[0].strip())
+  tipo = COMMIT_TO_BRANCH_TYPE.get(m.group(1), "chore") if m else "chore"
+  desc = _slug(m.group(3)) if m else ""
+  return f"{tipo}/issue-{issue_id or '<id>'}/{desc or '<descripcion-corta>'}"
+
+
+def avisos_rama(rama):
+  """Devuelve la lista de avisos sobre el nombre de la rama (vacía si cumple)."""
+  if not rama:
+    return []
+  if rama in PROTECTED_BRANCHES:
+    return [f"'{rama}' es una rama protegida: no se deben hacer commits directos en ella"]
+  m = BRANCH_RE.match(rama)
+  if not m:
+    return [f"'{rama}' no sigue el formato <tipo>/issue-<id>/<descripcion-corta> (tipos: {'|'.join(BRANCH_TYPES)})"]
+  palabras = m.group(3).split("-")
+  if all(p in GENERIC_WORDS or p.isdigit() for p in palabras):
+    return [f"la descripción '{m.group(3)}' de la rama es genérica; indica para qué sirve"]
+  return []
+
+
+def mostrar_avisos_rama(rama, avisos, commit, issue_id):
+  """Imprime los avisos de rama con la propuesta de renombrado."""
+  if not avisos:
+    return
+  sugerida = sugerir_rama(commit, issue_id)
+  print("=" * 60)
+  print("AVISO: la rama no cumple la convención del equipo")
+  for a in avisos:
+    print(f"  - {a}")
+  print(f"  Nombre propuesto: {sugerida}")
+  if rama in PROTECTED_BRANCHES:
+    print(f"  Crea una rama desde la base y trabaja ahí: git switch -c {sugerida}")
+  else:
+    print(f"  Renómbrala con:   git branch -m {sugerida}")
+    if upstream_actual():
+      print(f"  (ya está en remoto: tras renombrar, 'git push -u origin {sugerida}' y borra la antigua si procede)")
+  if "<id>" in sugerida:
+    print("  Sustituye <id> por el ID de la tarea de Odoo")
+  print("=" * 60)
+
+
+def titulo_mr(commit, issue_id):
+  """Título sugerido para el merge request: [FIX] #45315 - Validate ..."""
+  m = HEADER_RE.match(commit.split("\n", 1)[0].strip())
+  if not m or not issue_id:
+    return None
+  desc = m.group(3)
+  return f"[{m.group(1).upper()}] #{issue_id} - {desc[:1].upper()}{desc[1:]}"
+
+
+def score_quality(output):
+  """Porcentaje de reglas de la convención que cumple el commit y detalle de checks."""
   text = output.strip()
   if not text:
     return 0.0, [{"name": "output no vacío", "pass": False}]
-
-  lines = [li.rstrip() for li in text.split("\n")]
-  first_line = lines[0] if lines else ""
-
-  type_regex = re.compile(rf"^({'|'.join(VALID_TYPES)}):")
-  checks.append({"name": "tipo válido", "pass": bool(type_regex.search(first_line))})
-  checks.append({"name": "título ≤ 150 chars", "pass": len(first_line) <= 150})
-  checks.append({"name": "título termina con punto", "pass": first_line.strip().endswith(".")})
-  checks.append({"name": "título en voz pasiva", "pass": bool(re.search(r"\b(?:Se|Fue|Fueron)\s+\w", first_line, re.I))})
-
-  bullets = [li for li in lines if li.startswith("* ")]
-  checks.append({"name": "tiene bullets", "pass": len(bullets) >= 1})
+  lines = text.split("\n")
+  header = lines[0]
+  errores = errores_cabecera(header)
+  checks = [{"name": f"cabecera: {e}", "pass": False} for e in errores] or [{"name": "cabecera válida", "pass": True}]
+  checks.append({"name": "línea en blanco tras la cabecera", "pass": len(lines) > 1 and lines[1].strip() == ""})
+  bullets = [li for li in lines[2:] if li.startswith("* ")]
+  voz = re.compile(r"\b(?:Se|Fue|Fueron)\s+\w", re.I)
+  checks.append({"name": "tiene bullets '* '", "pass": len(bullets) >= 1})
   checks.append({"name": "≤ 7 bullets", "pass": len(bullets) <= 7})
-
-  scope_regex = re.compile(rf"\(({'|'.join(VALID_SCOPES)})\)\s*$")
-  if with_types:
-    checks.append({"name": "bullets con alcance válido", "pass": len(bullets) > 0 and all(scope_regex.search(b) for b in bullets)})
-  else:
-    checks.append({"name": "bullets sin alcance", "pass": len(bullets) > 0 and all(not scope_regex.search(b) for b in bullets)})
-  voz_regex = re.compile(r"\b(?:Se|Fue|Fueron)\s+\w", re.I)
-  checks.append({"name": "bullets en voz pasiva", "pass": len(bullets) > 0 and all(voz_regex.search(b) for b in bullets)})
-
-  blank_between = bool(re.search(r"\n\s*\n", text))
-  checks.append({"name": "línea en blanco entre título y bullets", "pass": blank_between})
-  checks.append({"name": "longitud total < 800 chars", "pass": len(text) < 800})
+  checks.append({"name": "bullets en español (voz pasiva)", "pass": bool(bullets) and all(voz.search(b) for b in bullets)})
+  checks.append({"name": "bullets terminan con punto", "pass": bool(bullets) and all(b.rstrip().endswith(".") for b in bullets)})
   checks.append({"name": "sin separadores ===", "pass": not re.search(r"={3,}", text)})
-
   passed = sum(1 for c in checks if c["pass"])
   return passed / len(checks), checks
 
@@ -753,25 +872,30 @@ def carrera_modelos(diff, system_prompt):
   hilos = [threading.Thread(target=_worker, args=(m,), daemon=True) for m in MODELS]
   for h in hilos:
     h.start()
-  ganador = None
+  # Gana el primero cuya cabecera cumple la convención; si ninguno, el primero no vacío
+  respaldo = None
   for _ in range(len(MODELS)):
     r = cola.get()
-    if r.get("output", "").strip():
-      ganador = r
-      break
-  return ganador
+    out = normalizar_commit(r.get("output", ""))
+    if not out:
+      continue
+    if not errores_cabecera(out.split("\n", 1)[0]):
+      return r
+    respaldo = respaldo or r
+  return respaldo
 
 
 def parse_args(args):
   """Parsea argv del comando. Devuelve (opts, error); opts=None para --help."""
-  opts = {"commit": None, "with_types": False, "commit_push": False, "include_excluded": False}
+  opts = {"commit": None, "commit_push": False, "include_excluded": False}
   i = 0
   while i < len(args):
     a = args[i]
     if a in ("-h", "--help"):
       return None, None
     if a == "--with-types":
-      opts["with_types"] = True
+      # Obsoleto: el ámbito ya va siempre en la cabecera <tipo>(<ámbito>)
+      print("Aviso: --with-types está obsoleto; el ámbito ya va en la cabecera <tipo>(<ámbito>)")
       i += 1
       continue
     if a in ("--commit-push", "-y"):
@@ -815,7 +939,7 @@ def resolver_commit(commit_id):
   return proc.stdout.strip() or None
 
 
-USAGE = "Uso: xtool git-diff [--commit <id>] [--with-types] [--commit-push | -y] [--include-excluded | -a]"
+USAGE = "Uso: xtool git-diff [--commit <id>] [--commit-push | -y] [--include-excluded | -a]"
 
 
 def hacer_commit(mensaje):
@@ -1027,10 +1151,9 @@ def main(argv=None):
     print(__doc__.strip())
     return 0
   commit_id = opts["commit"]
-  with_types = opts["with_types"]
   commit_push = opts["commit_push"]
   include_excluded = opts["include_excluded"]
-  system_prompt = build_system_prompt(with_types)
+  system_prompt = SYSTEM_PROMPT
 
   if commit_id:
     info = resolver_commit(commit_id)
@@ -1063,9 +1186,14 @@ def main(argv=None):
     resumen += f" · {len(meta['omitted_files'])} omitidos"
   print(resumen)
 
-  issue_id = get_issue_id()
+  rama = rama_actual()
+  issue_id = issue_id_de_rama(rama)
   if issue_id:
-    print(f"Rama con ID detectado: [{issue_id}] se antepondrá al commit")
+    print(f"Rama con ID de tarea: se añadirá 'Refs: #{issue_id}' al commit")
+  # La rama solo se valida al generar un commit nuevo (no con --commit <id>)
+  avisos = [] if commit_id else avisos_rama(rama)
+  if avisos:
+    print(f"Aviso: la rama '{rama}' no cumple la convención (propuesta al final)")
 
   ganador = carrera_modelos(diff, system_prompt)
   results = [ganador] if ganador else []
@@ -1078,7 +1206,7 @@ def main(argv=None):
       continue
     price = PRICING_USD_PER_1M.get(r["model"], {"input": 0, "output": 0})
     cost = (r["prompt_tokens"] * price["input"] + r["completion_tokens"] * price["output"]) / 1_000_000
-    quality, checks = score_quality(r["output"], with_types)
+    quality, checks = score_quality(normalizar_commit(r["output"]))
     scored.append({**r, "cost": cost, "quality": quality, "checks": checks})
 
   # header = "Modelo".ljust(16) + " | " + "1er token".rjust(9) + " | " + "Total".rjust(8) + " | " + "Tokens i/o".rjust(14) + " | " + "Costo".rjust(8) + " | " + "Calidad".rjust(7) + " | " + "Score".rjust(6)
@@ -1122,8 +1250,15 @@ def main(argv=None):
   else:
     best = scored[0]
     commit, summary = parse_response(best["output"])
-    commit = add_issue_prefix(commit, issue_id)
+    commit = add_refs(normalizar_commit(commit), issue_id)
     print(f"\n{commit}\n")
+    errores = errores_cabecera(commit.split("\n", 1)[0])
+    if errores:
+      print("Aviso: el commit generado no cumple la convención: " + "; ".join(errores))
+    mostrar_avisos_rama(rama, avisos, commit, issue_id)
+    mr = titulo_mr(commit, issue_id)
+    if mr:
+      print(f"Título MR sugerido: {mr}")
     if commit_push:
       return_code = 0 if commit_y_push(commit) else 1
     else:

@@ -156,22 +156,30 @@ referencias de `--track` se guardan en `~/.local/state/xtool/titles/`.
 
 ## git-diff
 
-`xtool git-diff` genera un mensaje de commit Conventional Commits en español
-(voz pasiva y con bullets) a partir del diff staged, usando IA
+`xtool git-diff` genera un mensaje de commit Conventional Commits con la
+cabecera en inglés (`<tipo>(<ámbito>): <descripción>`) y las descripciones
+en español (bullets `* ` en voz pasiva) a partir del diff staged, usando IA
 (zai-sdk, modelo `glm-5.3-flash`).
 
 ```bash
 git add ...            # staging de los cambios a commitear
 xtool git-diff         # analiza el diff y genera el mensaje
 xtool git-diff --commit <id>   # descripción alternativa de un commit existente
-xtool git-diff --with-types    # cada bullet añade su alcance: (gui), (api), ...
 xtool git-diff --commit-push   # genera el mensaje, commitea el staged y pushea
 xtool git-diff -y              # forma corta de --commit-push
 xtool git-diff -a              # incluye json, yaml, .gitignore y test.py (--include-excluded)
 ```
 
-- Por defecto los bullets terminan solo con punto; con `--with-types` cada
-  bullet añade su alcance entre paréntesis, p. ej. `(gui)`, `(api)`.
+- Sigue la convención del equipo: tipos
+  `feat|fix|security|refactor|perf|test|docs|build|ci|chore|style`,
+  descripción en imperativo, en minúscula, sin punto final y cabecera de
+  menos de 72 caracteres. De la tercera línea al final, bullets en español.
+  `--with-types` queda obsoleto (el ámbito ya va en la cabecera).
+- Valida la rama actual contra `<tipo>/issue-<id>/<descripcion-corta>`
+  (tipos `feature|fix|hotfix|refactor|security|docs|test|chore`): si no
+  cumple, es genérica o es protegida (`main`, `master`, `production`) avisa
+  y propone un nombre con el `git branch -m` / `git switch -c` a ejecutar.
+  Es solo un aviso: no bloquea `-y`.
 - Con `--commit <id>` se analiza el diff de ese commit (`git show`, admite
   hash, `HEAD~1`, rama, ...) en lugar del diff staged y se genera una
   descripción alternativa de sus cambios.
@@ -189,8 +197,11 @@ xtool git-diff -a              # incluye json, yaml, .gitignore y test.py (--inc
 - Requiere `TOKEN_AI` en el `.env` del proyecto o en el del arsenal.
 - El commit ganador se copia al portapapeles (listo para `git commit`);
   con `--commit-push` no se copia: el commit ya lo hace el propio comando.
-- Si la rama actual lleva un ID numérico (`feat-123`, `issue/45`,
-  `hotfix-789`, ...), se antepone `[123]` al commit generado.
+- Si la rama lleva el ID de la tarea (`fix/issue-45315/...`, o ramas viejas
+  como `feat-123`, `issue/45`, `hotfix-789`, `feature/login-45315`), el
+  commit termina con
+  `Refs: #45315` y se sugiere el título del MR
+  (`[FIX] #45315 - Validate newsletter subscription requests`).
 - El diff se limita a 1M de caracteres: se excluyen lockfiles, binarios y
   generados y, si aún supera el límite, se trunca por archivo dejando un
   resumen (`--compact-summary`) de lo omitido.
