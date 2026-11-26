@@ -7,6 +7,8 @@ Uso:
   xtool git-diff --with-types
   xtool git-diff --commit-push
   xtool git-diff -y            # forma corta de --commit-push
+  xtool git-diff --include-excluded   # incluye json, yaml, .gitignore, test.py
+  xtool git-diff -a            # forma corta de --include-excluded
 
 Requisitos:
   - Estar en un repo git con cambios staged (git add), o usar --commit <id>
@@ -19,6 +21,11 @@ hash, HEAD~1, rama, etc. (todo lo que resuelva git).
 El diff se limita a 1M de caracteres: se excluyen lockfiles, binarios y
 generados y, si aun así supera el límite, se trunca por archivo dejando un
 resumen de lo omitido.
+
+Por defecto no se analizan *.json, *.yaml/*.yml, .gitignore ni test.py.
+Con --include-excluded (o -a) se incluyen; útil cuando el staged solo toca
+esos archivos. El filtrado de lockfiles, binarios y generados se mantiene,
+salvo que deje el diff vacío (entonces se analiza todo).
 
 Si la rama actual lleva un ID numérico (feat-123, issue/45, hotfix-789, ...)
 se antepone [123] al commit generado.
@@ -406,13 +413,18 @@ def _fit_chunks(chunks, budget):
   return full, truncated, omitted
 
 
-def _compact_stats(paths, commit_id=None):
+def _pathspec_excludes(include_excluded=False):
+  return [] if include_excluded else ORIGINAL_EXCLUDES
+
+
+def _compact_stats(paths, commit_id=None, include_excluded=False):
   if not paths:
     return []
+  excludes = _pathspec_excludes(include_excluded)
   if commit_id:
-    cmd = ["git", "show", "--format=", "--compact-summary", commit_id, "--", ".", *ORIGINAL_EXCLUDES]
+    cmd = ["git", "show", "--format=", "--compact-summary", commit_id, "--", ".", *excludes]
   else:
-    cmd = ["git", "diff", "--cached", "--compact-summary", "--", ".", *ORIGINAL_EXCLUDES]
+    cmd = ["git", "diff", "--cached", "--compact-summary", "--", ".", *excludes]
   try:
     proc = subprocess.run(
       cmd,
@@ -435,8 +447,8 @@ def _compact_stats(paths, commit_id=None):
   return [stats[p] for p in paths if p in stats]
 
 
-def _build_tail(paths, commit_id=None):
-  lines = _compact_stats([p for p in paths if p], commit_id)
+def _build_tail(paths, commit_id=None, include_excluded=False):
+  lines = _compact_stats([p for p in paths if p], commit_id, include_excluded)
   if not lines:
     return ""
   shown = lines[:TAIL_MAX_LINES]
@@ -470,7 +482,7 @@ def _add_stage(stages, label, before, after, files_before, files_after, dropped,
   })
 
 
-def get_git_diff(commit_id=None):
+def get_git_diff(commit_id=None, include_excluded=False):
   """Obtiene el diff a analizar: del commit dado (git show) o del staged."""
   meta = {
     "error": None,
@@ -486,11 +498,12 @@ def get_git_diff(commit_id=None):
     "stages": [],
     "tail_chars": 0,
   }
+  excludes = _pathspec_excludes(include_excluded)
   if commit_id:
     # --format= suprime el mensaje original: solo interesa el diff
-    cmd = ["git", "show", "--format=", *GIT_DIFF_FLAGS, commit_id, "--", ".", *ORIGINAL_EXCLUDES]
+    cmd = ["git", "show", "--format=", *GIT_DIFF_FLAGS, commit_id, "--", ".", *excludes]
   else:
-    cmd = ["git", "diff", "--cached", *GIT_DIFF_FLAGS, "--", ".", *ORIGINAL_EXCLUDES]
+    cmd = ["git", "diff", "--cached", *GIT_DIFF_FLAGS, "--", ".", *excludes]
   meta["command"] = " ".join(cmd)
   try:
     proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -558,7 +571,7 @@ def get_git_diff(commit_id=None):
 
   if total > MAX_DIFF_CHARS:
     rounds.append(3)
-    pre_tail = _build_tail(meta["excluded_files"], commit_id)
+    pre_tail = _build_tail(meta["excluded_files"], commit_id, include_excluded)
     full, truncated, omitted = _fit_chunks(keep, MAX_DIFF_CHARS - len(pre_tail) - MARKER_RESERVE)
     body = sum(len(c["text"]) for c in full) + sum(len(t["text"]) for t in truncated)
     _add_stage(
@@ -581,7 +594,7 @@ def get_git_diff(commit_id=None):
   tail = ""
   tail_paths = list(meta["excluded_files"]) + list(meta["omitted_files"]) + [t["path"] for t in truncated]
   if tail_paths:
-    tail = _build_tail(tail_paths, commit_id)
+    tail = _build_tail(tail_paths, commit_id, include_excluded)
 
   final = "".join([c["text"] for c in full] + [t["text"] for t in truncated]) + tail
   while len(final) > MAX_DIFF_CHARS and "\n" in tail:
@@ -751,7 +764,7 @@ def carrera_modelos(diff, system_prompt):
 
 def parse_args(args):
   """Parsea argv del comando. Devuelve (opts, error); opts=None para --help."""
-  opts = {"commit": None, "with_types": False, "commit_push": False}
+  opts = {"commit": None, "with_types": False, "commit_push": False, "include_excluded": False}
   i = 0
   while i < len(args):
     a = args[i]
@@ -763,6 +776,10 @@ def parse_args(args):
       continue
     if a in ("--commit-push", "-y"):
       opts["commit_push"] = True
+      i += 1
+      continue
+    if a in ("--include-excluded", "-a"):
+      opts["include_excluded"] = True
       i += 1
       continue
     if a == "--commit":
@@ -798,7 +815,7 @@ def resolver_commit(commit_id):
   return proc.stdout.strip() or None
 
 
-USAGE = "Uso: xtool git-diff [--commit <id>] [--with-types] [--commit-push | -y]"
+USAGE = "Uso: xtool git-diff [--commit <id>] [--with-types] [--commit-push | -y] [--include-excluded | -a]"
 
 
 def hacer_commit(mensaje):
@@ -1012,6 +1029,7 @@ def main(argv=None):
   commit_id = opts["commit"]
   with_types = opts["with_types"]
   commit_push = opts["commit_push"]
+  include_excluded = opts["include_excluded"]
   system_prompt = build_system_prompt(with_types)
 
   if commit_id:
@@ -1021,13 +1039,14 @@ def main(argv=None):
       return 1
     print(f"Analizando commit: {info}")
 
-  diff, meta = get_git_diff(commit_id)
+  diff, meta = get_git_diff(commit_id, include_excluded)
 
   if diff is None:
     if meta["error"]:
       print(f"Error al obtener git diff: {meta['error']}")
     elif meta["empty_reason"] == "all_excluded":
       print("Solo hay cambios en archivos excluidos (json, lockfiles, generados). No hay nada para analizar")
+      print("Usa --include-excluded (o -a) para incluirlos")
     elif meta["empty_reason"] == "empty_commit":
       print(f"El commit '{commit_id}' no tiene cambios que analizar (¿merge o commit vacío?)")
     else:

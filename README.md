@@ -122,6 +122,10 @@ detecta cambios entre corridas. Sustituye a `scripts/get-titles.sh`.
 # rutas por parámetro (base_url + rutas; "Nombre|/ruta" para fijar el nombre)
 xtool titles https://www.solocruceros.com /minicruceros /cruceros-desde-malaga
 
+# lista custom de URLs completas (pueden ser de dominios distintos)
+xtool titles --pages https://dominio.com/pag1 https://dominio.com/pag2
+xtool titles -p "Home|https://dominio.com/" https://otro.com/x --track
+
 # listas guardadas en YAML (~/.config/xtool/titles.yaml)
 xtool titles --init                  # crea el YAML de ejemplo
 xtool titles --list                  # sets configurados
@@ -163,6 +167,7 @@ xtool git-diff --commit <id>   # descripción alternativa de un commit existente
 xtool git-diff --with-types    # cada bullet añade su alcance: (gui), (api), ...
 xtool git-diff --commit-push   # genera el mensaje, commitea el staged y pushea
 xtool git-diff -y              # forma corta de --commit-push
+xtool git-diff -a              # incluye json, yaml, .gitignore y test.py (--include-excluded)
 ```
 
 - Por defecto los bullets terminan solo con punto; con `--with-types` cada
@@ -178,6 +183,9 @@ xtool git-diff -y              # forma corta de --commit-push
   el commit porque git se niega a mergear con cambios staged. Solo si el
   pull termina en conflicto NO se pushea: el commit queda en local y el
   conflicto se resuelve a mano. Incompatible con `--commit <id>`.
+- Por defecto se excluyen `*.json`, `*.yaml`/`*.yml`, `.gitignore` y
+  `test.py`; con `--include-excluded` (o `-a`) se analizan también. Se
+  combina con `-y`: `xtool git-diff -a -y`.
 - Requiere `TOKEN_AI` en el `.env` del proyecto o en el del arsenal.
 - El commit ganador se copia al portapapeles (listo para `git commit`);
   con `--commit-push` no se copia: el commit ya lo hace el propio comando.

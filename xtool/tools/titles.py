@@ -5,24 +5,31 @@ Uso:
   xtool titles --set <nombre>                 # lista definida en el YAML
   xtool titles --set ig https://sbox-...      # misma lista, otra base_url
   xtool titles                                # set 'default' del YAML
+  xtool titles --pages <url...>               # lista custom de URLs completas
 
 Ejemplos:
   xtool titles https://www.solocruceros.com /minicruceros /cruceros-desde-malaga
+  xtool titles --pages https://www.solocruceros.com/minicruceros https://www.solocruceros.com/cruceros-desde-malaga
+  xtool titles --pages "Málaga|https://www.solocruceros.com/cruceros-desde-malaga"
   xtool titles https://www.solocruceros.com "Málaga|/cruceros-desde-malaga"
   xtool titles --set desde --track            # compara con la corrida anterior
   xtool titles --set ig -o ~/Desktop/titles.json
   xtool titles --set ig --compare ~/Desktop/titles.json
+  xtool titles --pages "Home|https://dominio.com/" https://otro.com/x --track
 
 Argumentos posicionales:
   http(s)://...      base_url (sobrescribe la del set)
   /ruta              ruta relativa a base_url
   "Nombre|/ruta"     ruta con nombre; "Nombre|https://..." usa la URL tal cual
-  Si se pasan rutas, reemplazan a las del set (base_url del set se conserva).
+  Si se pasan rutas (o --pages), reemplazan a las del set (base_url se conserva).
 
 Flags:
   -c, --config <f>   YAML de configuración (default: ~/.config/xtool/titles.yaml
                      o la variable de entorno XTOOL_TITLES_CONFIG)
   -s, --set <nombre> set del YAML a revisar (default: 'default' si existe)
+  -p, --pages        todos los posicionales son páginas (no se toma el primero
+                     como base_url). Admite URLs completas, "Nombre|URL" y
+                     /rutas (estas usan la base_url de --set si se indica).
   --list             lista los sets configurados
   --init             crea el YAML de ejemplo si no existe
   -o, --out <f>      guarda el resultado JSON en <f>
@@ -158,7 +165,8 @@ def cargar_yaml(ruta: Path):
 
 
 def nombre_desde_ruta(path: str) -> str:
-  seg = urlparse(path).path.strip("/").split("/")[-1] or path
+  u = urlparse(path)
+  seg = u.path.strip("/").split("/")[-1] or u.netloc or path
   return seg.replace("-", " ").capitalize()
 
 
@@ -263,6 +271,7 @@ def main(argv=None):
 
   config_arg = set_name = out = compare = None
   track = as_json = listar = init = False
+  pages_mode = "-p" in argv or "--pages" in argv
   timeout = 15.0
   base_cli = None
   rutas_cli = []
@@ -307,10 +316,13 @@ def main(argv=None):
       listar = True
     elif a == "--init":
       init = True
+    elif a in ("-p", "--pages"):
+      pass  # ya resuelto antes del bucle
     elif a.startswith("-") and a != "-":
       err(f"ERROR: opción desconocida: {a}")
       return 1
-    elif a.startswith(("http://", "https://")) and "|" not in a and base_cli is None and not rutas_cli:
+    elif (not pages_mode and a.startswith(("http://", "https://")) and "|" not in a
+          and base_cli is None and not rutas_cli):
       base_cli = a
     else:
       rutas_cli.append(a)
@@ -390,7 +402,8 @@ def main(argv=None):
 
   # ─── Comparación ─────────────────────────────────────────────────────
   hubo_cambios = False
-  referencia = compare or (clave_track(set_name, base_url) if track else None)
+  base_track = base_url or (paginas[0]["url"] if paginas else "")
+  referencia = compare or (clave_track(set_name, base_track) if track else None)
   if referencia is not None:
     previo = leer_previo(referencia)
     if as_json:
