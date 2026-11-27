@@ -27,7 +27,7 @@ esos archivos. El filtrado de lockfiles, binarios y generados se mantiene,
 salvo que deje el diff vacío (entonces se analiza todo).
 
 Convención del equipo (ramas y commits en inglés, minúsculas, números y '-'):
-  commit: <tipo>(<ámbito>): <descripción>
+  commit: <tipo>(<ámbito>): [<id>] <descripción>   ([<id>] solo si hay ID de tarea)
           tipos: feat|fix|security|refactor|perf|test|docs|build|ci|chore|style
           descripción en imperativo (add, fix, remove), empieza en minúscula,
           sin punto final y cabecera de menos de 72 caracteres. Solo la
@@ -37,7 +37,9 @@ Convención del equipo (ramas y commits en inglés, minúsculas, números y '-')
           tipos: feature|fix|hotfix|refactor|security|docs|test|chore
           p. ej. fix/issue-45315/newsletter-spam-validation
 
-Si la rama lleva el ID de la tarea el commit termina con 'Refs: #<id>' y se
+Si la rama lleva el ID de la tarea la cabecera lo incluye entre corchetes
+tras los dos puntos (fix(api): [45315] validate input, contando para el
+límite de 72), el commit termina con 'Refs: #<id>' y se
 sugiere el título del merge request ([FIX] #45315 - Validate ...). El ID se
 saca también de ramas viejas que no siguen la convención: prefijo conocido
 (feat-123, issue/45, hotfix-789, feature_1012, ...) o, si no, cualquier
@@ -145,7 +147,8 @@ COMMIT_TO_BRANCH_TYPE = {
   "test": "test", "docs": "docs", "build": "chore", "ci": "chore", "chore": "chore", "style": "chore",
 }
 HEADER_MAX = 72
-HEADER_RE = re.compile(rf"^({'|'.join(VALID_TYPES)})\(([a-z0-9]+(?:[-/][a-z0-9]+)*)\): (\S.*)$")
+# El ID de tarea opcional ([45315]) va tras los dos puntos y no forma parte de la descripción
+HEADER_RE = re.compile(rf"^({'|'.join(VALID_TYPES)})\(([a-z0-9]+(?:[-/][a-z0-9]+)*)\): (?:\[\d+\] )?(\S.*)$")
 
 SYSTEM_PROMPT = """
 Genera un mensaje de commit Conventional Commits a partir del diff.
@@ -691,10 +694,16 @@ def normalizar_commit(commit):
 
 
 def add_refs(commit, issue_id):
-  """Añade el footer 'Refs: #<id>' al final del commit si hay ID de tarea."""
+  """Si hay ID de tarea, lo pone como '[<id>]' en la cabecera y añade el footer 'Refs: #<id>'.
+
+  fix(api): validate input -> fix(api): [45315] validate input
+  """
   if not issue_id:
     return commit
-  return f"{commit}\n\nRefs: #{issue_id}"
+  header, sep, resto = commit.partition("\n")
+  if not re.search(r"^[^:]+:\s*\[\d+\]", header):
+    header = re.sub(r"^([^:]+:)\s*", lambda m: f"{m.group(1)} [{issue_id}] ", header, count=1)
+  return f"{header}{sep}{resto}\n\nRefs: #{issue_id}"
 
 
 def errores_cabecera(header):
@@ -1225,7 +1234,12 @@ def main(argv=None):
   rama = rama_actual()
   issue_id = issue_id_de_rama(rama)
   if issue_id:
-    print(f"Rama con ID de tarea: se añadirá 'Refs: #{issue_id}' al commit")
+    print(f"Rama con ID de tarea: se añadirá '[{issue_id}]' a la cabecera y 'Refs: #{issue_id}' al commit")
+    # El prefijo '[<id>] ' lo añade el script; el modelo debe dejarle sitio dentro del límite
+    system_prompt += (
+      f"\nLa cabecera llevará además el prefijo '[{issue_id}] ' tras '): ' (se añade automáticamente, no lo escribas): "
+      f"la cabecera sin él debe tener menos de {HEADER_MAX - len(issue_id) - 3} caracteres.\n"
+    )
   # La rama solo se valida al generar un commit nuevo (no con --commit <id>)
   avisos = [] if commit_id else avisos_rama(rama)
   if avisos:

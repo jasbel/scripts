@@ -199,7 +199,9 @@ xtool git-diff -a              # incluye json, yaml, .gitignore y test.py (--inc
   con `--commit-push` no se copia: el commit ya lo hace el propio comando.
 - Si la rama lleva el ID de la tarea (`fix/issue-45315/...`, o ramas viejas
   como `feat-123`, `issue/45`, `hotfix-789`, `feature/login-45315`), el
-  commit termina con
+  ID se añade a la cabecera entre corchetes tras los dos puntos
+  (`fix(newsletter): [45315] validate subscription requests`, contando para
+  el límite de 72 caracteres), el commit termina con
   `Refs: #45315` y se sugiere el título del MR
   (`[FIX] #45315 - Validate newsletter subscription requests`).
 - El diff se limita a 1M de caracteres: se excluyen lockfiles, binarios y
