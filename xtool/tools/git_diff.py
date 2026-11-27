@@ -30,7 +30,7 @@ Convención del equipo (ramas y commits en inglés, minúsculas, números y '-')
   commit: <tipo>(<ámbito>): [<id>] <descripción>   ([<id>] solo si hay ID de tarea)
           tipos: feat|fix|security|refactor|perf|test|docs|build|ci|chore|style
           descripción en imperativo (add, fix, remove), empieza en minúscula,
-          sin punto final y cabecera de menos de 72 caracteres. Solo la
+          sin punto final y cabecera de menos de 72 caracteres + 8. Solo la
           cabecera va en inglés: de la tercera línea al final van bullets
           '* ' en español (voz pasiva), como antes.
   rama:   <tipo>/issue-<id>/<descripcion-corta>
@@ -39,7 +39,7 @@ Convención del equipo (ramas y commits en inglés, minúsculas, números y '-')
 
 Si la rama lleva el ID de la tarea la cabecera lo incluye entre corchetes
 tras los dos puntos (fix(api): [45315] validate input, contando para el
-límite de 72), el commit termina con 'Refs: #<id>' y se
+límite de 72+8), el commit termina con 'Refs: #<id>' y se
 sugiere el título del merge request ([FIX] #45315 - Validate ...). El ID se
 saca también de ramas viejas que no siguen la convención: prefijo conocido
 (feat-123, issue/45, hotfix-789, feature_1012, ...) o, si no, cualquier
@@ -146,7 +146,7 @@ COMMIT_TO_BRANCH_TYPE = {
   "feat": "feature", "fix": "fix", "security": "security", "refactor": "refactor", "perf": "refactor",
   "test": "test", "docs": "docs", "build": "chore", "ci": "chore", "chore": "chore", "style": "chore",
 }
-HEADER_MAX = 72
+HEADER_MAX = 72+8
 # El ID de tarea opcional ([45315]) va tras los dos puntos y no forma parte de la descripción
 HEADER_RE = re.compile(rf"^({'|'.join(VALID_TYPES)})\(([a-z0-9]+(?:[-/][a-z0-9]+)*)\): (?:\[\d+\] )?(\S.*)$")
 
@@ -165,7 +165,7 @@ Reglas de la PRIMERA LÍNEA (cabecera), SIEMPRE EN INGLÉS:
 - type: feat|fix|security|refactor|perf|test|docs|build|ci|chore|style
 - scope: módulo/área tocada, solo minúsculas, números y "-" (p. ej. mailchimp, api, git-diff).
 - description: en inglés, modo imperativo (add, fix, remove, validate...), empieza en minúscula,
-  sin punto final, sin acentos; la línea completa debe tener menos de 72 caracteres.
+  sin punto final, sin acentos; la línea completa debe tener menos de 72+8 caracteres.
   Sé específico; nunca "changes", "fixes", "update", "wip", "final" ni "fix bug".
   Ejemplo: fix(mailchimp): validate newsletter subscription requests
 
